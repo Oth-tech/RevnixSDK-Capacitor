@@ -96,8 +96,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   }
 
   async resolvePlacement(options: { placementKey: string }): Promise<PlacementResolution> {
-    // Wire-identical shapes; revnix-react brands `paywall` with its own
-    // interface and uses null where this plugin's definitions use undefined.
+    // Wire-identical shapes (this plugin's PlacementPaywall/PaywallConfig
+    // mirror revnix-react's); revnix-react uses null where this plugin's
+    // definitions use undefined, matching the native bridges which omit the
+    // key entirely.
     const resolution = await this.require().resolvePlacement(options.placementKey);
     return {
       ...resolution,

@@ -403,13 +403,13 @@ removeAllListeners() => Promise<void>
 
 #### PlacementResolution
 
-| Prop               | Type                                                             | Description                                                 |
-| ------------------ | ---------------------------------------------------------------- | ----------------------------------------------------------- |
-| **`status`**       | <code>string</code>                                              |                                                             |
-| **`placementKey`** | <code>string</code>                                              |                                                             |
-| **`revision`**     | <code>number</code>                                              | Published catalog revision this resolution came from.       |
-| **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code>  |                                                             |
-| **`paywall`**      | <code><a href="#record">Record</a>&lt;string, unknown&gt;</code> | Remote paywall render contract — your app renders it in v1. |
+| Prop               | Type                                                            | Description                                                                                                                                                       |
+| ------------------ | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`status`**       | <code>string</code>                                             |                                                                                                                                                                   |
+| **`placementKey`** | <code>string</code>                                             |                                                                                                                                                                   |
+| **`revision`**     | <code>number</code>                                             | Published catalog revision this resolution came from.                                                                                                             |
+| **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code> |                                                                                                                                                                   |
+| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>   | Remote paywall render contract — your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key). |
 
 
 #### PlacementOffering
@@ -427,6 +427,86 @@ removeAllListeners() => Promise<void>
 | --------------- | ------------------- |
 | **`packageId`** | <code>string</code> |
 | **`productId`** | <code>string</code> |
+
+
+#### PlacementPaywall
+
+| Prop            | Type                                                    |
+| --------------- | ------------------------------------------------------- |
+| **`paywallId`** | <code>string</code>                                     |
+| **`name`**      | <code>string</code>                                     |
+| **`config`**    | <code><a href="#paywallconfig">PaywallConfig</a></code> |
+
+
+#### PaywallConfig
+
+Remote paywall design attached to a placement. Render contract — the app
+draws this with its own components; prices still come from the store
+(StoreKit / Play Billing) so the display never disagrees with the charge.
+
+| Prop                     | Type                                                                                                                            | Description                                                                                                                                                                       |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`template`**           | <code>'focus' \| 'feature-list' \| 'minimal' \| 'hero' \| 'timeline' \| 'plans' \| 'feature-grid' \| 'offer' \| 'reveal'</code> | Layout — the screen structure to render. The dashboard's template gallery is presets over these layouts; the first three are the original templates and render exactly as before. |
+| **`mode`**               | <code>'dark' \| 'light'</code>                                                                                                  | Color scheme the paywall renders in. Absent (legacy config) = dark.                                                                                                               |
+| **`headline`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
+| **`subheadline`**        | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
+| **`features`**           | <code>PaywallFeature[]</code>                                                                                                   |                                                                                                                                                                                   |
+| **`ctaLabel`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
+| **`highlightPackageId`** | <code>string</code>                                                                                                             | packageId of the visually highlighted package.                                                                                                                                    |
+| **`badgeText`**          | <code>string</code>                                                                                                             | Badge on the highlighted package, e.g. "SAVE 17%".                                                                                                                                |
+| **`accent`**             | <code>string</code>                                                                                                             | Accent hex like "#6478ff"; fall back to the app theme when absent.                                                                                                                |
+| **`heroImageUrl`**       | <code>string</code>                                                                                                             | Hero image URL rendered above the headline in place of the icon tile.                                                                                                             |
+| **`review`**             | <code><a href="#paywallreview">PaywallReview</a></code>                                                                         |                                                                                                                                                                                   |
+| **`offer`**              | <code><a href="#paywalloffer">PaywallOffer</a></code>                                                                           |                                                                                                                                                                                   |
+| **`footer`**             | <code><a href="#paywallfooter">PaywallFooter</a></code>                                                                         |                                                                                                                                                                                   |
+
+
+#### PaywallFeature
+
+| Prop              | Type                |
+| ----------------- | ------------------- |
+| **`icon`**        | <code>string</code> |
+| **`title`**       | <code>string</code> |
+| **`description`** | <code>string</code> |
+
+
+#### PaywallReview
+
+Social proof, dashboard-configured. Any layout renders the pieces that
+are set: stars/quote card above the packages, `count` under the CTA.
+
+| Prop         | Type                | Description                                       |
+| ------------ | ------------------- | ------------------------------------------------- |
+| **`rating`** | <code>number</code> | 0–5; rendered as a star row.                      |
+| **`quote`**  | <code>string</code> |                                                   |
+| **`author`** | <code>string</code> |                                                   |
+| **`count`**  | <code>string</code> | e.g. "Join 2M+ users" — small line under the CTA. |
+
+
+#### PaywallOffer
+
+Win-back/offer presentation: anchor price struck through on the
+highlighted package, urgency line above the CTA. Any layout.
+
+| Prop                     | Type                |
+| ------------------------ | ------------------- |
+| **`strikethroughPrice`** | <code>string</code> |
+| **`urgencyText`**        | <code>string</code> |
+
+
+#### PaywallFooter
+
+Footer links, dashboard-configured. Absent (legacy config) = show all
+three. When a URL is set open it directly; otherwise run your own
+terms/privacy handler.
+
+| Prop              | Type                 |
+| ----------------- | -------------------- |
+| **`showRestore`** | <code>boolean</code> |
+| **`showTerms`**   | <code>boolean</code> |
+| **`showPrivacy`** | <code>boolean</code> |
+| **`termsUrl`**    | <code>string</code>  |
+| **`privacyUrl`**  | <code>string</code>  |
 
 
 #### PluginListenerHandle
@@ -454,12 +534,5 @@ A background failure the SDK swallowed (queue drains, telemetry beacons).
 Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 <code>'apple' | 'google'</code>
-
-
-#### Record
-
-Construct a type with a set of properties K of type T
-
-<code>{ [P in K]: T; }</code>
 
 </docgen-api>
