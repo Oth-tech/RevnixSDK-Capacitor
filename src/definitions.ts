@@ -86,14 +86,86 @@ export interface PlacementOffering {
   packages: PlacementPackage[];
 }
 
+export interface PaywallFeature {
+  icon?: string;
+  title: string;
+  description?: string;
+}
+
+/** Social proof, dashboard-configured. Any layout renders the pieces that
+ *  are set: stars/quote card above the packages, `count` under the CTA. */
+export interface PaywallReview {
+  /** 0–5; rendered as a star row. */
+  rating?: number;
+  quote?: string;
+  author?: string;
+  /** e.g. "Join 2M+ users" — small line under the CTA. */
+  count?: string;
+}
+
+/** Win-back/offer presentation: anchor price struck through on the
+ *  highlighted package, urgency line above the CTA. Any layout. */
+export interface PaywallOffer {
+  strikethroughPrice?: string;
+  urgencyText?: string;
+}
+
+/** Footer links, dashboard-configured. Absent (legacy config) = show all
+ *  three. When a URL is set open it directly; otherwise run your own
+ *  terms/privacy handler. */
+export interface PaywallFooter {
+  showRestore: boolean;
+  showTerms: boolean;
+  showPrivacy: boolean;
+  termsUrl?: string;
+  privacyUrl?: string;
+}
+
+/**
+ * Remote paywall design attached to a placement. Render contract — the app
+ * draws this with its own components; prices still come from the store
+ * (StoreKit / Play Billing) so the display never disagrees with the charge.
+ */
+export interface PaywallConfig {
+  /** Layout — the screen structure to render. The dashboard's template
+   *  gallery is presets over these layouts; the first three are the
+   *  original templates and render exactly as before. */
+  template: 'focus' | 'feature-list' | 'minimal' | 'hero' | 'timeline' | 'plans' | 'feature-grid' | 'offer' | 'reveal';
+  /** Color scheme the paywall renders in. Absent (legacy config) = dark. */
+  mode?: 'dark' | 'light';
+  headline: string;
+  subheadline?: string;
+  features: PaywallFeature[];
+  ctaLabel: string;
+  /** packageId of the visually highlighted package. */
+  highlightPackageId?: string;
+  /** Badge on the highlighted package, e.g. "SAVE 17%". */
+  badgeText?: string;
+  /** Accent hex like "#6478ff"; fall back to the app theme when absent. */
+  accent?: string;
+  /** Hero image URL rendered above the headline in place of the icon tile. */
+  heroImageUrl?: string;
+  review?: PaywallReview;
+  offer?: PaywallOffer;
+  footer?: PaywallFooter;
+}
+
+export interface PlacementPaywall {
+  paywallId: string;
+  name: string;
+  config: PaywallConfig;
+}
+
 export interface PlacementResolution {
   status: string;
   placementKey: string;
   /** Published catalog revision this resolution came from. */
   revision: number;
   offering: PlacementOffering;
-  /** Remote paywall render contract — your app renders it in v1. */
-  paywall?: Record<string, unknown>;
+  /** Remote paywall render contract — your app renders it in v1. Absent when
+   *  the placement has no paywall attached (the wire sends null; native
+   *  bridges omit the key). */
+  paywall?: PlacementPaywall;
 }
 
 /** A background failure the SDK swallowed (queue drains, telemetry beacons). */
