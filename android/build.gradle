@@ -15,11 +15,14 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+        // Vendored revnix-core models are @Serializable.
+        classpath "org.jetbrains.kotlin:kotlin-serialization:$kotlin_version"
     }
 }
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 
 android {
     namespace = "com.revnix.capacitor"
@@ -58,6 +61,15 @@ repositories {
 
 dependencies {
     implementation fileTree(dir: 'libs', include: ['*.jar'])
+    // revnix-kotlin (revnix-core + revnix-android) is VENDORED under
+    // src/main/kotlin/com/revnix — see the note there. Once it ships to
+    // Maven Central, delete the vendored sources and restore
+    //   implementation "com.revnix:revnix-android:0.1.0"
+    // These are its dependencies, carried over verbatim:
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2"
+    implementation "org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    implementation "com.android.billingclient:billing-ktx:8.3.0"
     implementation project(':capacitor-android')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.core:core-ktx:$androidxCoreKTXVersion"

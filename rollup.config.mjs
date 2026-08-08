@@ -7,6 +7,7 @@ export default {
       name: 'capacitorRevnix',
       globals: {
         '@capacitor/core': 'capacitorExports',
+        'revnix-react': 'revnixReact',
       },
       sourcemap: true,
       inlineDynamicImports: true,
@@ -18,5 +19,5 @@ export default {
       inlineDynamicImports: true,
     },
   ],
-  external: ['@capacitor/core'],
+  external: ['@capacitor/core', 'revnix-react'],
 };

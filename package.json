@@ -1,6 +1,6 @@
 {
   "name": "revnix-capacitor",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Revnix subscriptions and entitlements for Capacitor.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -76,5 +76,8 @@
     "android": {
       "src": "android"
     }
+  },
+  "dependencies": {
+    "revnix-react": "^0.12.0"
   }
 }

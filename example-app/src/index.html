@@ -11,14 +11,25 @@
   </head>
   <body>
     <main>
-      <h1>Capacitor Test Plugin Project</h1>
+      <h1>Revnix Capacitor Test App</h1>
       <p>
-        This project can be used to test out the functionality of your plugin. Nothing in the
-        <em>example-app/</em> folder will be published to npm when using this template, so you can create away!
+        Exercises the plugin against a live Revnix deployment. Nothing in
+        <em>example-app/</em> is published to npm.
       </p>
-      <label for="echoInput">Echo Text:</label>
-      <input type="text" id="echoInput" name="echoInput" value="Hello World!" />
-      <button onclick="testEcho()">Click Me!</button>
+      <label for="apiKey">Publishable key:</label>
+      <input type="text" id="apiKey" value="rvx_pk_test_…" />
+      <label for="baseUrl">Base URL:</label>
+      <input type="text" id="baseUrl" value="https://your-deployment.convex.site" />
+      <button onclick="testConfigure()">Configure</button>
+      <hr />
+      <label for="entitlementId">Entitlement:</label>
+      <input type="text" id="entitlementId" value="pro" />
+      <button onclick="testEntitlement()">Check</button>
+      <hr />
+      <label for="placementKey">Placement:</label>
+      <input type="text" id="placementKey" value="main_paywall" />
+      <button onclick="testPlacement()">Resolve</button>
+      <pre id="output"></pre>
     </main>
 
     <script src="./js/example.js" type="module"></script>
