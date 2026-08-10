@@ -14,7 +14,13 @@ revnix-kotlin 0.2.0.
   The served offering/paywall are already the variant's — attribution
   metadata only, nothing to branch on
 - Vendored native cores bumped to the 0.2.0 sources; web appends the
-  parameter itself until revnix-react ships experiment support
+  parameter itself (revnix-react gained its own experiment support in 0.14.0)
+- `setAttributes({ attributes })` (REV-033) — the write half of audience
+  targeting: sets string/number attributes on the current customer, `null`
+  deletes a key. Rejects rather than firing and forgetting, since the next
+  `resolvePlacement` may depend on it. `email`/`username` are reserved
+  (secret key only) and a server-set attribute cannot be changed from a
+  device; both reject the whole batch
 
 ## 0.1.0
 
