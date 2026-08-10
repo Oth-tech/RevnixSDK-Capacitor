@@ -21,6 +21,8 @@ import type {
  */
 export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   private client: RevnixClient | null = null;
+  /** Kept for the setAttributes shim below — see the note there. */
+  private credentials: { apiKey: string; baseUrl: string } | null = null;
 
   private require(): RevnixClient {
     if (!this.client) {
@@ -31,6 +33,7 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
 
   async configure(options: ConfigureOptions): Promise<void> {
     this.client?.dispose();
+    this.credentials = { apiKey: options.apiKey, baseUrl: options.baseUrl };
     this.client = new RevnixClient({
       apiKey: options.apiKey,
       baseUrl: options.baseUrl,
@@ -41,6 +44,20 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
         setItem: (key: string, value: string) => {
           window.localStorage.setItem(key, value);
         },
+      },
+      // REV-219: identify the caller on placement reads so the server can pin
+      // a sticky experiment variant. revnix-react 0.12.0 does not send the
+      // parameter itself; append it here (guarded, so a future revnix-react
+      // that does is not double-appended). Older servers simply ignore it.
+      fetch: async (input, init) => {
+        if (this.client && (typeof input === 'string' || input instanceof URL)) {
+          const url = new URL(String(input));
+          if (/\/v1\/placements\/[^/]+\/offering$/.test(url.pathname) && !url.searchParams.has('customer')) {
+            url.searchParams.set('customer', await this.client.getCustomerId());
+            return fetch(url.toString(), init);
+          }
+        }
+        return fetch(input, init);
       },
       reportInstalls: true,
       installMetadata: { platform: 'web' },
@@ -99,11 +116,13 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     // Wire-identical shapes (this plugin's PlacementPaywall/PaywallConfig
     // mirror revnix-react's); revnix-react uses null where this plugin's
     // definitions use undefined, matching the native bridges which omit the
-    // key entirely.
+    // key entirely. `experiment` passes through untouched, normalized to
+    // null when an older server omits the key (REV-219).
     const resolution = await this.require().resolvePlacement(options.placementKey);
     return {
       ...resolution,
       paywall: (resolution.paywall ?? undefined) as PlacementResolution['paywall'],
+      experiment: (resolution.experiment ?? null) as PlacementResolution['experiment'],
     } as PlacementResolution;
   }
 
@@ -113,5 +132,35 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
 
   async logPaywallShown(options?: { placementKey?: string; paywallId?: string }): Promise<void> {
     this.require().logPaywallShown(options);
+  }
+
+  // REV-033 v2: revnix-react 0.12.0 has no setAttributes, so this posts the
+  // endpoint directly — the same version-skew shim this file already uses for
+  // the ?customer= placement parameter, and removable the same way once the
+  // dependency is bumped to a revnix-react that exposes the method.
+  async setAttributes(options: {
+    attributes: Record<string, string | number | null>;
+  }): Promise<void> {
+    const client = this.require();
+    const credentials = this.credentials;
+    if (!credentials) throw new Error('Revnix.configure() must be called first');
+    const customerId = await client.getCustomerId();
+    const res = await fetch(
+      `${credentials.baseUrl.replace(/\/$/, '')}/v1/customers/${encodeURIComponent(
+        customerId,
+      )}/attributes`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${credentials.apiKey}`,
+        },
+        body: JSON.stringify({ attributes: options.attributes }),
+      },
+    );
+    if (!res.ok) {
+      const detail = await res.text();
+      throw new Error(`setAttributes failed (${res.status}): ${detail}`);
+    }
   }
 }

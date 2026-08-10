@@ -29,6 +29,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "resolvePlacement", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "registerInstall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallShown", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
     ]
 
     private var client: RevnixClient?
@@ -214,6 +215,34 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func setAttributes(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let raw = call.getObject("attributes") else {
+            call.reject("attributes object is required", "invalid")
+            return
+        }
+        // Values cross the WebView bridge as NSString/NSNumber/NSNull;
+        // anything else is a caller bug the server would 400 anyway.
+        var attributes: [String: JSONValue] = [:]
+        for (key, value) in raw {
+            if value is NSNull {
+                attributes[key] = .null
+            } else if let text = value as? String {
+                attributes[key] = .string(text)
+            } else if let number = value as? NSNumber {
+                attributes[key] = .number(number.doubleValue)
+            }
+        }
+        Task {
+            do {
+                try await client.setAttributes(attributes)
+                call.resolve()
+            } catch {
+                Self.reject(call, error)
+            }
+        }
+    }
+
     // MARK: - Marshalling
 
     private static func js(_ snapshot: CustomerEntitlements) -> [String: Any] {
@@ -276,6 +305,9 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             "offering": offering,
         ]
         if let paywall = resolution.paywall { out["paywall"] = any(paywall) }
+        // REV-219: always present, per the TS contract — a null/absent wire
+        // value both surface as JS null.
+        out["experiment"] = resolution.experiment.map(any) ?? NSNull()
         return out
     }
 

@@ -124,6 +124,13 @@ public data class PlacementResolution(
     val offering: PlacementOffering,
     /** Remote paywall render contract (see docs) — app-rendered in v1. */
     val paywall: JsonElement? = null,
+    /**
+     * REV-219: the running experiment's sticky `{key, variantId}` assignment
+     * for this customer, passed through to JS untouched. JSON null (or absent,
+     * on older servers) when no running experiment covers the placement — the
+     * bridge surfaces both as JS null.
+     */
+    val experiment: JsonElement? = null,
 )
 
 /** Swallowed background failure (queue drains, telemetry beacons). */

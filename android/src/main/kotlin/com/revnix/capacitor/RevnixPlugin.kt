@@ -22,6 +22,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import org.json.JSONObject
 
 /**
@@ -235,6 +236,28 @@ class RevnixPlugin : Plugin() {
         }
     }
 
+    @PluginMethod
+    fun setAttributes(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val raw = call.getObject("attributes")
+        if (raw == null) {
+            call.reject("attributes object is required", "invalid")
+            return
+        }
+        val attributes = mutableMapOf<String, Any?>()
+        for (key in raw.keys()) {
+            attributes[key] = if (raw.isNull(key)) null else raw.get(key)
+        }
+        scope.launch {
+            try {
+                active.setAttributes(attributes)
+                call.resolve()
+            } catch (err: Throwable) {
+                reject(call, err)
+            }
+        }
+    }
+
     // MARK: - Marshalling
 
     private fun js(snapshot: CustomerEntitlements): JSObject = JSObject().apply {
@@ -305,6 +328,12 @@ class RevnixPlugin : Plugin() {
             },
         )
         resolution.paywall?.let { put("paywall", js(it)) }
+        // REV-219: always present, per the TS contract — a null/absent wire
+        // value both surface as JS null.
+        when (val experiment = resolution.experiment) {
+            null, JsonNull -> put("experiment", JSONObject.NULL)
+            else -> put("experiment", js(experiment))
+        }
     }
 
     /** kotlinx JsonElement → org.json, via its canonical string form. */
