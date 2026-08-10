@@ -156,6 +156,14 @@ export interface PlacementPaywall {
   config: PaywallConfig;
 }
 
+/** A/B experiment assignment (REV-219). The served `offering`/`paywall` are
+ *  already the assigned variant's — this is attribution metadata, not
+ *  something the app needs to branch on. */
+export interface PlacementExperiment {
+  key: string;
+  variantId: string;
+}
+
 export interface PlacementResolution {
   status: string;
   placementKey: string;
@@ -166,6 +174,10 @@ export interface PlacementResolution {
    *  the placement has no paywall attached (the wire sends null; native
    *  bridges omit the key). */
   paywall?: PlacementPaywall;
+  /** Sticky experiment assignment for this customer; `null` when no running
+   *  experiment covers the placement (older servers omit the key — every
+   *  bridge normalizes that to null). */
+  experiment: PlacementExperiment | null;
 }
 
 /** A background failure the SDK swallowed (queue drains, telemetry beacons). */
@@ -231,6 +243,18 @@ export interface RevnixPlugin {
   /** Fire-and-forget paywall impression. Call when the paywall becomes
    *  visible, not when you start loading it. */
   logPaywallShown(options?: { placementKey?: string; paywallId?: string }): Promise<void>;
+
+  /** Set attributes on the current customer. Attributes are what A/B-test
+   *  audiences target — set `country`, `app_version`, `locale`, or any custom
+   *  key you want to segment on. `null` deletes a key.
+   *
+   *  Rejects, unlike the fire-and-forget beacons: the next placement resolve
+   *  may depend on these. `email` and `username` are reserved (secret key
+   *  only), and an attribute your backend already set cannot be changed from
+   *  a device. */
+  setAttributes(options: {
+    attributes: Record<string, string | number | null>;
+  }): Promise<void>;
 
   /** Background failures the SDK swallowed (queue drains, telemetry). */
   addListener(

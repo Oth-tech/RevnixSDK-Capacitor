@@ -146,4 +146,9 @@ public struct PlacementResolution: Codable, Sendable, Equatable {
     public let offering: PlacementOffering
     /// Remote paywall render contract (see docs) — app-rendered in v1.
     public let paywall: JSONValue?
+    /// REV-219: the running experiment's sticky `{key, variantId}` assignment
+    /// for this customer, passed through to JS untouched. nil when no
+    /// experiment applies — the server sends null, and older servers omit the
+    /// key entirely; the bridge surfaces both as JS null.
+    public let experiment: JSONValue?
 }

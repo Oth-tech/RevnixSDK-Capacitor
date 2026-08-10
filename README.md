@@ -7,7 +7,7 @@ the same client contract as every Revnix SDK, one implementation per platform:
 - **Android** bridges [`revnix-kotlin`](https://github.com/Oth-tech/revnix-kotlin) (Play Billing 8)
 - **Web** delegates to [`revnix-react`](https://www.npmjs.com/package/revnix-react) — the canonical TypeScript implementation of the resilience policy
 
-> Until the native SDKs ship to CocoaPods/SPM and Maven Central, their 0.1.0
+> Until the native SDKs ship to CocoaPods/SPM and Maven Central, their 0.2.0
 > sources are **vendored** inside this plugin (`ios/…/Revnix/`,
 > `android/…/com/revnix/`) so it builds standalone. Fix native bugs upstream,
 > then re-copy.
@@ -31,7 +31,8 @@ await Revnix.configure({
 // Gate. Never rejects; unknown or unreachable means locked.
 const { entitled } = await Revnix.isEntitled({ entitlementId: 'pro' });
 
-// Paywall
+// Paywall. The resolve identifies the customer so a running A/B experiment
+// can serve a sticky variant — `placement.experiment` names it (or is null).
 const placement = await Revnix.resolvePlacement({ placementKey: 'main_paywall' });
 await Revnix.logPaywallShown({ placementKey: 'main_paywall' });
 
@@ -403,13 +404,14 @@ removeAllListeners() => Promise<void>
 
 #### PlacementResolution
 
-| Prop               | Type                                                            | Description                                                                                                                                                       |
-| ------------------ | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`status`**       | <code>string</code>                                             |                                                                                                                                                                   |
-| **`placementKey`** | <code>string</code>                                             |                                                                                                                                                                   |
-| **`revision`**     | <code>number</code>                                             | Published catalog revision this resolution came from.                                                                                                             |
-| **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code> |                                                                                                                                                                   |
-| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>   | Remote paywall render contract — your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key). |
+| Prop               | Type                                                                        | Description                                                                                                                                                                 |
+| ------------------ | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`status`**       | <code>string</code>                                                         |                                                                                                                                                                             |
+| **`placementKey`** | <code>string</code>                                                         |                                                                                                                                                                             |
+| **`revision`**     | <code>number</code>                                                         | Published catalog revision this resolution came from.                                                                                                                       |
+| **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code>             |                                                                                                                                                                             |
+| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>               | Remote paywall render contract — your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key).           |
+| **`experiment`**   | <code><a href="#placementexperiment">PlacementExperiment</a> \| null</code> | Sticky experiment assignment for this customer; `null` when no running experiment covers the placement (older servers omit the key — every bridge normalizes that to null). |
 
 
 #### PlacementOffering
@@ -507,6 +509,18 @@ terms/privacy handler.
 | **`showPrivacy`** | <code>boolean</code> |
 | **`termsUrl`**    | <code>string</code>  |
 | **`privacyUrl`**  | <code>string</code>  |
+
+
+#### PlacementExperiment
+
+A/B experiment assignment (REV-219). The served `offering`/`paywall` are
+already the assigned variant's — this is attribution metadata, not
+something the app needs to branch on.
+
+| Prop            | Type                |
+| --------------- | ------------------- |
+| **`key`**       | <code>string</code> |
+| **`variantId`** | <code>string</code> |
 
 
 #### PluginListenerHandle
