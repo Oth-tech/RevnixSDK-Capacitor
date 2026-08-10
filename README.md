@@ -3,8 +3,8 @@
 [Revnix](https://revnix.io) subscriptions and entitlements for Capacitor —
 the same client contract as every Revnix SDK, one implementation per platform:
 
-- **iOS** bridges [`revnix-swift`](https://github.com/Oth-tech/revnix-swift) (StoreKit 2)
-- **Android** bridges [`revnix-kotlin`](https://github.com/Oth-tech/revnix-kotlin) (Play Billing 8)
+- **iOS** bridges [`revnix-swift`](https://github.com/Oth-tech/RevnixSDK-iOS) (StoreKit 2)
+- **Android** bridges [`revnix-kotlin`](https://github.com/Oth-tech/RevnixSDK-Android) (Play Billing 8)
 - **Web** delegates to [`revnix-react`](https://www.npmjs.com/package/revnix-react) — the canonical TypeScript implementation of the resilience policy
 
 > Until the native SDKs ship to CocoaPods/SPM and Maven Central, their 0.2.0
@@ -84,6 +84,7 @@ npx cap sync
 * [`resolvePlacement(...)`](#resolveplacement)
 * [`registerInstall(...)`](#registerinstall)
 * [`logPaywallShown(...)`](#logpaywallshown)
+* [`setAttributes(...)`](#setattributes)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
@@ -298,6 +299,28 @@ visible, not when you start loading it.
 | Param         | Type                                                        |
 | ------------- | ----------------------------------------------------------- |
 | **`options`** | <code>{ placementKey?: string; paywallId?: string; }</code> |
+
+--------------------
+
+
+### setAttributes(...)
+
+```typescript
+setAttributes(options: { attributes: Record<string, string | number | null>; }) => Promise<void>
+```
+
+Set attributes on the current customer. Attributes are what A/B-test
+audiences target — set `country`, `app_version`, `locale`, or any custom
+key you want to segment on. `null` deletes a key.
+
+Rejects, unlike the fire-and-forget beacons: the next placement resolve
+may depend on these. `email` and `username` are reserved (secret key
+only), and an attribute your backend already set cannot be changed from
+a device.
+
+| Param         | Type                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ attributes: <a href="#record">Record</a>&lt;string, string \| number \| null&gt;; }</code> |
 
 --------------------
 
@@ -548,5 +571,12 @@ A background failure the SDK swallowed (queue drains, telemetry beacons).
 Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 <code>'apple' | 'google'</code>
+
+
+#### Record
+
+Construct a type with a set of properties K of type T
+
+<code>{ [P in K]: T; }</code>
 
 </docgen-api>
