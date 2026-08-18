@@ -67,6 +67,40 @@ Sync native files
 npx cap sync
 ```
 
+## Paywall UI
+
+`renderRevnixPaywall` draws a placement's published `PaywallConfig` as plain
+DOM — no framework, no extra dependency. Capacitor apps run in a WebView, so
+the one renderer covers iOS, Android, and web, and it renders exactly what the
+dashboard's paywall-builder previews (all nine template layouts). Prices still
+come from the store — pass localized `priceLabel`s so the display never
+disagrees with the charge.
+
+```ts
+import { Revnix, renderRevnixPaywall } from 'revnix-capacitor';
+
+const placement = await Revnix.resolvePlacement({ placementKey: 'main_paywall' });
+if (!placement.paywall) return;
+
+// The container must have a height — e.g. a full-screen fixed overlay.
+const handle = renderRevnixPaywall(document.getElementById('paywall-overlay')!, {
+  config: placement.paywall.config,
+  packages: [
+    // packageId from the offering; title/priceLabel from StoreKit / Play Billing.
+    { packageId: 'monthly', title: 'Monthly', priceLabel: '$9.99/mo' },
+    { packageId: 'annual', title: 'Annual', priceLabel: '$59.99/yr' },
+  ],
+  onPurchase: (packageId) => startPurchase(packageId),
+  onRestore: () => restorePurchases(),
+  client: Revnix, // reports one paywall view per render
+  placementKey: 'main_paywall',
+  paywallId: placement.paywall.paywallId,
+});
+
+handle.update({ loading: true }); // spinner in the CTA while purchasing
+handle.destroy(); // remove from the DOM when dismissed
+```
+
 ## API
 
 <docgen-index>

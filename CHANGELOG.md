@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- `renderRevnixPaywall(container, options)` (REV-226) — framework-free DOM
+  paywall renderer, ported 1:1 from revnix-react's `RevnixPaywall` (all nine
+  template layouts, dark/light modes, anchor-price currency guard, one
+  `paywall.viewed` report per render-mount via the plugin). Returns a handle
+  with `update(partialOptions)` / `destroy()`
+
 ## 0.2.0
 
 A/B experiments (REV-219) — parity with revnix-swift 0.2.0 and

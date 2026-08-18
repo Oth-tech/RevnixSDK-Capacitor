@@ -12,4 +12,5 @@ const Revnix = registerPlugin<RevnixPlugin>('Revnix', {
 });
 
 export * from './definitions';
+export * from './ui';
 export { Revnix };
