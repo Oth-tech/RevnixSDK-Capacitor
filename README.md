@@ -210,7 +210,7 @@ when this customer never had a live read. Never touches the network.
 isEntitled(options: { entitlementId: string; }) => Promise<{ entitled: boolean; }>
 ```
 
-Gate helper, never rejects. Unknown or unreachable resolves false, so
+Gate helper; never rejects. Unknown or unreachable resolves false, so
 gates fail closed.
 
 | Param         | Type                                    |
@@ -264,7 +264,8 @@ durably and the call rejects; it is never lost.
 retryPendingPurchases() => Promise<{ delivered: number; }>
 ```
 
-Drain the persistent retry queue. Safe on every launch/foreground; the server dedupes on the purchase key. (Web reports `delivered: 0`;
+Drain the persistent retry queue. Safe on every launch/foreground;
+the server dedupes on the purchase key. (Web reports `delivered: 0`;
 revnix-react drains internally without a count.)
 
 **Returns:** <code>Promise&lt;{ delivered: number; }&gt;</code>
@@ -389,13 +390,13 @@ removeAllListeners() => Promise<void>
 
 #### ConfigureOptions
 
-| Prop                       | Type                | Description                                                                                                                                                                                                          |
-| -------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prop                       | Type                | Description                                                                                                                                                                                                         |
+| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`apiKey`**               | <code>string</code> | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary; identify/alias are server-proxied by design and not part of this plugin. |
-| **`baseUrl`**              | <code>string</code> | e.g. `https://your-deployment.convex.site`                                                                                                                                                                           |
-| **`timeoutMs`**            | <code>number</code> | Per-request timeout in ms. Default 10 000.                                                                                                                                                                           |
-| **`entitlementsTtlMs`**    | <code>number</code> | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                               |
-| **`offlineMaxCacheAgeMs`** | <code>number</code> | Snapshots older than this serve as all-inactive. Default 14 days.                                                                                                                                                    |
+| **`baseUrl`**              | <code>string</code> | e.g. `https://your-deployment.convex.site`                                                                                                                                                                          |
+| **`timeoutMs`**            | <code>number</code> | Per-request timeout in ms. Default 10 000.                                                                                                                                                                          |
+| **`entitlementsTtlMs`**    | <code>number</code> | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                              |
+| **`offlineMaxCacheAgeMs`** | <code>number</code> | Snapshots older than this serve as all-inactive. Default 14 days.                                                                                                                                                   |
 
 
 #### CustomerEntitlements
@@ -431,42 +432,42 @@ removeAllListeners() => Promise<void>
 
 #### RegisterPurchaseResult
 
-| Prop                       | Type                 | Description                                                                                                        |
-| -------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| **`eventId`**              | <code>string</code>  |                                                                                                                    |
+| Prop                       | Type                 | Description                                                                                                       |
+| -------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **`eventId`**              | <code>string</code>  |                                                                                                                   |
 | **`seq`**                  | <code>number</code>  | Ledger position; pass to waitForEntitlements to unlock.                                                           |
-| **`duplicate`**            | <code>boolean</code> |                                                                                                                    |
-| **`customerId`**           | <code>string</code>  | The id to use going forward. The SDK adopts it automatically.                                                      |
-| **`transferred`**          | <code>boolean</code> |                                                                                                                    |
-| **`ownedByOtherCustomer`** | <code>boolean</code> |                                                                                                                    |
-| **`refused`**              | <code>string</code>  |                                                                                                                    |
-| **`restored`**             | <code>boolean</code> |                                                                                                                    |
+| **`duplicate`**            | <code>boolean</code> |                                                                                                                   |
+| **`customerId`**           | <code>string</code>  | The id to use going forward. The SDK adopts it automatically.                                                     |
+| **`transferred`**          | <code>boolean</code> |                                                                                                                   |
+| **`ownedByOtherCustomer`** | <code>boolean</code> |                                                                                                                   |
+| **`refused`**              | <code>string</code>  |                                                                                                                   |
+| **`restored`**             | <code>boolean</code> |                                                                                                                   |
 | **`provisional`**          | <code>boolean</code> | Recorded without store proof: live but time-boxed until the store confirms. Expect true for Google device claims. |
 
 
 #### RegisterPurchaseInput
 
-| Prop                        | Type                                                        | Description                                                         |
-| --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------- |
-| **`source`**                | <code><a href="#revnixstorekind">RevnixStoreKind</a></code> |                                                                     |
-| **`token`**                 | <code>string</code>                                         | Apple: originalTransactionId · Google: purchaseToken.               |
-| **`productId`**             | <code>string</code>                                         |                                                                     |
-| **`transactionId`**         | <code>string</code>                                         | Google: this is the purchaseToken too (the established rule).       |
-| **`occurredAt`**            | <code>number</code>                                         |                                                                     |
-| **`expiresAt`**             | <code>number</code>                                         |                                                                     |
+| Prop                        | Type                                                        | Description                                                        |
+| --------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------ |
+| **`source`**                | <code><a href="#revnixstorekind">RevnixStoreKind</a></code> |                                                                    |
+| **`token`**                 | <code>string</code>                                         | Apple: originalTransactionId · Google: purchaseToken.              |
+| **`productId`**             | <code>string</code>                                         |                                                                    |
+| **`transactionId`**         | <code>string</code>                                         | Google: this is the purchaseToken too (the established rule).      |
+| **`occurredAt`**            | <code>number</code>                                         |                                                                    |
+| **`expiresAt`**             | <code>number</code>                                         |                                                                    |
 | **`signedTransactionInfo`** | <code>string</code>                                         | StoreKit 2 JWS: the proof path, claims without it are provisional. |
 
 
 #### PlacementResolution
 
-| Prop               | Type                                                                        | Description                                                                                                                                                                 |
-| ------------------ | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`status`**       | <code>string</code>                                                         |                                                                                                                                                                             |
-| **`placementKey`** | <code>string</code>                                                         |                                                                                                                                                                             |
-| **`revision`**     | <code>number</code>                                                         | Published catalog revision this resolution came from.                                                                                                                       |
-| **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code>             |                                                                                                                                                                             |
-| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>               | Remote paywall render contract: your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key).           |
-| **`experiment`**   | <code><a href="#placementexperiment">PlacementExperiment</a> \| null</code> | Sticky experiment assignment for this customer; `null` when no running experiment covers the placement (older servers omit the key; every bridge normalizes that to null). |
+| Prop               | Type                                                                        | Description                                                                                                                                                                    |
+| ------------------ | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **`status`**       | <code>string</code>                                                         |                                                                                                                                                                                |
+| **`placementKey`** | <code>string</code>                                                         |                                                                                                                                                                                |
+| **`revision`**     | <code>number</code>                                                         | Published catalog revision this resolution came from.                                                                                                                          |
+| **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code>             |                                                                                                                                                                                |
+| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>               | Remote paywall render contract: your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key).               |
+| **`experiment`**   | <code><a href="#placementexperiment">PlacementExperiment</a> \| null</code> | Sticky experiment assignment for this customer; `null` when no running experiment covers the placement (older servers omit the key, and every bridge normalizes that to null). |
 
 
 #### PlacementOffering
@@ -501,21 +502,21 @@ Remote paywall design attached to a placement. Render contract: the app
 draws this with its own components; prices still come from the store
 (StoreKit / Play Billing) so the display never disagrees with the charge.
 
-| Prop                     | Type                                                                                                                            | Description                                                                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prop                     | Type                                                                                                                            | Description                                                                                                                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`template`**           | <code>'focus' \| 'feature-list' \| 'minimal' \| 'hero' \| 'timeline' \| 'plans' \| 'feature-grid' \| 'offer' \| 'reveal'</code> | Layout: the screen structure to render. The dashboard's template gallery is presets over these layouts; the first three are the original templates and render exactly as before. |
-| **`mode`**               | <code>'dark' \| 'light'</code>                                                                                                  | Color scheme the paywall renders in. Absent (legacy config) = dark.                                                                                                               |
-| **`headline`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
-| **`subheadline`**        | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
-| **`features`**           | <code>PaywallFeature[]</code>                                                                                                   |                                                                                                                                                                                   |
-| **`ctaLabel`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
-| **`highlightPackageId`** | <code>string</code>                                                                                                             | packageId of the visually highlighted package.                                                                                                                                    |
-| **`badgeText`**          | <code>string</code>                                                                                                             | Badge on the highlighted package, e.g. "SAVE 17%".                                                                                                                                |
-| **`accent`**             | <code>string</code>                                                                                                             | Accent hex like "#6478ff"; fall back to the app theme when absent.                                                                                                                |
-| **`heroImageUrl`**       | <code>string</code>                                                                                                             | Hero image URL rendered above the headline in place of the icon tile.                                                                                                             |
-| **`review`**             | <code><a href="#paywallreview">PaywallReview</a></code>                                                                         |                                                                                                                                                                                   |
-| **`offer`**              | <code><a href="#paywalloffer">PaywallOffer</a></code>                                                                           |                                                                                                                                                                                   |
-| **`footer`**             | <code><a href="#paywallfooter">PaywallFooter</a></code>                                                                         |                                                                                                                                                                                   |
+| **`mode`**               | <code>'dark' \| 'light'</code>                                                                                                  | Color scheme the paywall renders in. Absent (legacy config) = dark.                                                                                                              |
+| **`headline`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                  |
+| **`subheadline`**        | <code>string</code>                                                                                                             |                                                                                                                                                                                  |
+| **`features`**           | <code>PaywallFeature[]</code>                                                                                                   |                                                                                                                                                                                  |
+| **`ctaLabel`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                  |
+| **`highlightPackageId`** | <code>string</code>                                                                                                             | packageId of the visually highlighted package.                                                                                                                                   |
+| **`badgeText`**          | <code>string</code>                                                                                                             | Badge on the highlighted package, e.g. "SAVE 17%".                                                                                                                               |
+| **`accent`**             | <code>string</code>                                                                                                             | Accent hex like "#6478ff"; fall back to the app theme when absent.                                                                                                               |
+| **`heroImageUrl`**       | <code>string</code>                                                                                                             | Hero image URL rendered above the headline in place of the icon tile.                                                                                                            |
+| **`review`**             | <code><a href="#paywallreview">PaywallReview</a></code>                                                                         |                                                                                                                                                                                  |
+| **`offer`**              | <code><a href="#paywalloffer">PaywallOffer</a></code>                                                                           |                                                                                                                                                                                  |
+| **`footer`**             | <code><a href="#paywallfooter">PaywallFooter</a></code>                                                                         |                                                                                                                                                                                  |
 
 
 #### PaywallFeature
@@ -532,11 +533,11 @@ draws this with its own components; prices still come from the store
 Social proof, dashboard-configured. Any layout renders the pieces that
 are set: stars/quote card above the packages, `count` under the CTA.
 
-| Prop         | Type                | Description                                       |
-| ------------ | ------------------- | ------------------------------------------------- |
-| **`rating`** | <code>number</code> | 0–5; rendered as a star row.                      |
-| **`quote`**  | <code>string</code> |                                                   |
-| **`author`** | <code>string</code> |                                                   |
+| Prop         | Type                | Description                                      |
+| ------------ | ------------------- | ------------------------------------------------ |
+| **`rating`** | <code>number</code> | 0–5; rendered as a star row.                     |
+| **`quote`**  | <code>string</code> |                                                  |
+| **`author`** | <code>string</code> |                                                  |
 | **`count`**  | <code>string</code> | e.g. "Join 2M+ users"; small line under the CTA. |
 
 
@@ -609,8 +610,6 @@ Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 Construct a type with a set of properties K of type T
 
-<code>{
- [P in K]: T;
- }</code>
+<code>{ [P in K]: T; }</code>
 
 </docgen-api>
