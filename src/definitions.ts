@@ -6,7 +6,7 @@ export type RevnixStoreKind = 'apple' | 'google';
 export interface ConfigureOptions {
   /**
    * Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app +
-   * environment server-side. Secret keys must never ship in a binary —
+   * environment server-side. Secret keys must never ship in a binary;
    * identify/alias are server-proxied by design and not part of this plugin.
    */
   apiKey: string;
@@ -55,13 +55,13 @@ export interface RegisterPurchaseInput {
   transactionId: string;
   occurredAt?: number;
   expiresAt?: number;
-  /** StoreKit 2 JWS — the proof path; claims without it are provisional. */
+  /** StoreKit 2 JWS: the proof path, claims without it are provisional. */
   signedTransactionInfo?: string;
 }
 
 export interface RegisterPurchaseResult {
   eventId: string;
-  /** Ledger position — pass to waitForEntitlements to unlock. */
+  /** Ledger position; pass to waitForEntitlements to unlock. */
   seq: number;
   duplicate: boolean;
   /** The id to use going forward. The SDK adopts it automatically. */
@@ -70,7 +70,7 @@ export interface RegisterPurchaseResult {
   ownedByOtherCustomer?: boolean;
   refused?: string;
   restored?: boolean;
-  /** Recorded without store proof — live but time-boxed until the store
+  /** Recorded without store proof: live but time-boxed until the store
    *  confirms. Expect true for Google device claims. */
   provisional?: boolean;
 }
@@ -99,7 +99,7 @@ export interface PaywallReview {
   rating?: number;
   quote?: string;
   author?: string;
-  /** e.g. "Join 2M+ users" — small line under the CTA. */
+  /** e.g. "Join 2M+ users"; small line under the CTA. */
   count?: string;
 }
 
@@ -122,12 +122,12 @@ export interface PaywallFooter {
 }
 
 /**
- * Remote paywall design attached to a placement. Render contract — the app
+ * Remote paywall design attached to a placement. Render contract: the app
  * draws this with its own components; prices still come from the store
  * (StoreKit / Play Billing) so the display never disagrees with the charge.
  */
 export interface PaywallConfig {
-  /** Layout — the screen structure to render. The dashboard's template
+  /** Layout: the screen structure to render. The dashboard's template
    *  gallery is presets over these layouts; the first three are the
    *  original templates and render exactly as before. */
   template: 'focus' | 'feature-list' | 'minimal' | 'hero' | 'timeline' | 'plans' | 'feature-grid' | 'offer' | 'reveal';
@@ -157,7 +157,7 @@ export interface PlacementPaywall {
 }
 
 /** A/B experiment assignment (REV-219). The served `offering`/`paywall` are
- *  already the assigned variant's — this is attribution metadata, not
+ *  already the assigned variant's; this is attribution metadata, not
  *  something the app needs to branch on. */
 export interface PlacementExperiment {
   key: string;
@@ -170,12 +170,12 @@ export interface PlacementResolution {
   /** Published catalog revision this resolution came from. */
   revision: number;
   offering: PlacementOffering;
-  /** Remote paywall render contract — your app renders it in v1. Absent when
+  /** Remote paywall render contract: your app renders it in v1. Absent when
    *  the placement has no paywall attached (the wire sends null; native
    *  bridges omit the key). */
   paywall?: PlacementPaywall;
   /** Sticky experiment assignment for this customer; `null` when no running
-   *  experiment covers the placement (older servers omit the key — every
+   *  experiment covers the placement (older servers omit the key, and every
    *  bridge normalizes that to null). */
   experiment: PlacementExperiment | null;
 }
@@ -190,7 +190,7 @@ export interface RevnixDiagnostic {
  * Failure taxonomy: rejected calls carry `code` (network · timeout ·
  * rate_limited · server · bad_response · auth · not_found · purchase_blocked
  * · invalid) and `data.isRetryable`. Deliberate rejections (401/403/404/409)
- * are never masked by a cache — a kill-switch must stay a kill-switch.
+ * are never masked by a cache: a kill-switch must stay a kill-switch.
  */
 export interface RevnixPlugin {
   /** Configure once at startup. Native platforms drain the purchase retry
@@ -212,7 +212,7 @@ export interface RevnixPlugin {
    *  when this customer never had a live read. Never touches the network. */
   getCachedEntitlements(): Promise<{ snapshot: CustomerEntitlements | null }>;
 
-  /** Gate helper — never rejects. Unknown or unreachable resolves false, so
+  /** Gate helper; never rejects. Unknown or unreachable resolves false, so
    *  gates fail closed. */
   isEntitled(options: { entitlementId: string }): Promise<{ entitled: boolean }>;
 
@@ -221,10 +221,10 @@ export interface RevnixPlugin {
   waitForEntitlements(options: { seq: number }): Promise<CustomerEntitlements>;
 
   /** Register a store purchase. On a transient failure the claim is queued
-   *  durably and the call rejects — it is never lost. */
+   *  durably and the call rejects; it is never lost. */
   registerPurchase(options: RegisterPurchaseInput): Promise<RegisterPurchaseResult>;
 
-  /** Drain the persistent retry queue. Safe on every launch/foreground —
+  /** Drain the persistent retry queue. Safe on every launch/foreground;
    *  the server dedupes on the purchase key. (Web reports `delivered: 0`;
    *  revnix-react drains internally without a count.) */
   retryPendingPurchases(): Promise<{ delivered: number }>;
@@ -245,7 +245,7 @@ export interface RevnixPlugin {
   logPaywallShown(options?: { placementKey?: string; paywallId?: string }): Promise<void>;
 
   /** Set attributes on the current customer. Attributes are what A/B-test
-   *  audiences target — set `country`, `app_version`, `locale`, or any custom
+   *  audiences target; set `country`, `app_version`, `locale`, or any custom
    *  key you want to segment on. `null` deletes a key.
    *
    *  Rejects, unlike the fire-and-forget beacons: the next placement resolve
