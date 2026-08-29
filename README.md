@@ -1,11 +1,10 @@
 # revnix-capacitor
 
-[Revnix](https://revnix.io) subscriptions and entitlements for Capacitor —
-the same client contract as every Revnix SDK, one implementation per platform:
+[Revnix](https://revnix.io) subscriptions and entitlements for Capacitor, the same client contract as every Revnix SDK, one implementation per platform:
 
 - **iOS** bridges [`revnix-swift`](https://github.com/Oth-tech/RevnixSDK-iOS) (StoreKit 2)
 - **Android** bridges [`revnix-kotlin`](https://github.com/Oth-tech/RevnixSDK-Android) (Play Billing 8)
-- **Web** delegates to [`revnix-react`](https://www.npmjs.com/package/revnix-react) — the canonical TypeScript implementation of the resilience policy
+- **Web** delegates to [`revnix-react`](https://www.npmjs.com/package/revnix-react), the canonical TypeScript implementation of the resilience policy
 
 > Until the native SDKs ship to CocoaPods/SPM and Maven Central, their 0.2.0
 > sources are **vendored** inside this plugin (`ios/…/Revnix/`,
@@ -32,7 +31,7 @@ await Revnix.configure({
 const { entitled } = await Revnix.isEntitled({ entitlementId: 'pro' });
 
 // Paywall. The resolve identifies the customer so a running A/B experiment
-// can serve a sticky variant — `placement.experiment` names it (or is null).
+// can serve a sticky variant; `placement.experiment` names it (or is null).
 const placement = await Revnix.resolvePlacement({ placementKey: 'main_paywall' });
 await Revnix.logPaywallShown({ placementKey: 'main_paywall' });
 
@@ -70,10 +69,10 @@ npx cap sync
 ## Paywall UI
 
 `renderRevnixPaywall` draws a placement's published `PaywallConfig` as plain
-DOM — no framework, no extra dependency. Capacitor apps run in a WebView, so
+DOM, no framework, no extra dependency. Capacitor apps run in a WebView, so
 the one renderer covers iOS, Android, and web, and it renders exactly what the
 dashboard's paywall-builder previews (all nine template layouts). Prices still
-come from the store — pass localized `priceLabel`s so the display never
+come from the store; pass localized `priceLabel`s so the display never
 disagrees with the charge.
 
 ```ts
@@ -82,7 +81,7 @@ import { Revnix, renderRevnixPaywall } from 'revnix-capacitor';
 const placement = await Revnix.resolvePlacement({ placementKey: 'main_paywall' });
 if (!placement.paywall) return;
 
-// The container must have a height — e.g. a full-screen fixed overlay.
+// The container must have a height, e.g. a full-screen fixed overlay.
 const handle = renderRevnixPaywall(document.getElementById('paywall-overlay')!, {
   config: placement.paywall.config,
   packages: [
@@ -132,7 +131,7 @@ handle.destroy(); // remove from the DOM when dismissed
 Failure taxonomy: rejected calls carry `code` (network · timeout ·
 rate_limited · server · bad_response · auth · not_found · purchase_blocked
 · invalid) and `data.isRetryable`. Deliberate rejections (401/403/404/409)
-are never masked by a cache — a kill-switch must stay a kill-switch.
+are never masked by a cache: a kill-switch must stay a kill-switch.
 
 ### configure(...)
 
@@ -211,7 +210,7 @@ when this customer never had a live read. Never touches the network.
 isEntitled(options: { entitlementId: string; }) => Promise<{ entitled: boolean; }>
 ```
 
-Gate helper — never rejects. Unknown or unreachable resolves false, so
+Gate helper, never rejects. Unknown or unreachable resolves false, so
 gates fail closed.
 
 | Param         | Type                                    |
@@ -248,7 +247,7 @@ registerPurchase(options: RegisterPurchaseInput) => Promise<RegisterPurchaseResu
 ```
 
 Register a store purchase. On a transient failure the claim is queued
-durably and the call rejects — it is never lost.
+durably and the call rejects; it is never lost.
 
 | Param         | Type                                                                    |
 | ------------- | ----------------------------------------------------------------------- |
@@ -265,8 +264,7 @@ durably and the call rejects — it is never lost.
 retryPendingPurchases() => Promise<{ delivered: number; }>
 ```
 
-Drain the persistent retry queue. Safe on every launch/foreground —
-the server dedupes on the purchase key. (Web reports `delivered: 0`;
+Drain the persistent retry queue. Safe on every launch/foreground; the server dedupes on the purchase key. (Web reports `delivered: 0`;
 revnix-react drains internally without a count.)
 
 **Returns:** <code>Promise&lt;{ delivered: number; }&gt;</code>
@@ -344,7 +342,7 @@ setAttributes(options: { attributes: Record<string, string | number | null>; }) 
 ```
 
 Set attributes on the current customer. Attributes are what A/B-test
-audiences target — set `country`, `app_version`, `locale`, or any custom
+audiences target; set `country`, `app_version`, `locale`, or any custom
 key you want to segment on. `null` deletes a key.
 
 Rejects, unlike the fire-and-forget beacons: the next placement resolve
@@ -393,7 +391,7 @@ removeAllListeners() => Promise<void>
 
 | Prop                       | Type                | Description                                                                                                                                                                                                          |
 | -------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`apiKey`**               | <code>string</code> | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary — identify/alias are server-proxied by design and not part of this plugin. |
+| **`apiKey`**               | <code>string</code> | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary; identify/alias are server-proxied by design and not part of this plugin. |
 | **`baseUrl`**              | <code>string</code> | e.g. `https://your-deployment.convex.site`                                                                                                                                                                           |
 | **`timeoutMs`**            | <code>number</code> | Per-request timeout in ms. Default 10 000.                                                                                                                                                                           |
 | **`entitlementsTtlMs`**    | <code>number</code> | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                               |
@@ -436,14 +434,14 @@ removeAllListeners() => Promise<void>
 | Prop                       | Type                 | Description                                                                                                        |
 | -------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | **`eventId`**              | <code>string</code>  |                                                                                                                    |
-| **`seq`**                  | <code>number</code>  | Ledger position — pass to waitForEntitlements to unlock.                                                           |
+| **`seq`**                  | <code>number</code>  | Ledger position; pass to waitForEntitlements to unlock.                                                           |
 | **`duplicate`**            | <code>boolean</code> |                                                                                                                    |
 | **`customerId`**           | <code>string</code>  | The id to use going forward. The SDK adopts it automatically.                                                      |
 | **`transferred`**          | <code>boolean</code> |                                                                                                                    |
 | **`ownedByOtherCustomer`** | <code>boolean</code> |                                                                                                                    |
 | **`refused`**              | <code>string</code>  |                                                                                                                    |
 | **`restored`**             | <code>boolean</code> |                                                                                                                    |
-| **`provisional`**          | <code>boolean</code> | Recorded without store proof — live but time-boxed until the store confirms. Expect true for Google device claims. |
+| **`provisional`**          | <code>boolean</code> | Recorded without store proof: live but time-boxed until the store confirms. Expect true for Google device claims. |
 
 
 #### RegisterPurchaseInput
@@ -456,7 +454,7 @@ removeAllListeners() => Promise<void>
 | **`transactionId`**         | <code>string</code>                                         | Google: this is the purchaseToken too (the established rule).       |
 | **`occurredAt`**            | <code>number</code>                                         |                                                                     |
 | **`expiresAt`**             | <code>number</code>                                         |                                                                     |
-| **`signedTransactionInfo`** | <code>string</code>                                         | StoreKit 2 JWS — the proof path; claims without it are provisional. |
+| **`signedTransactionInfo`** | <code>string</code>                                         | StoreKit 2 JWS: the proof path, claims without it are provisional. |
 
 
 #### PlacementResolution
@@ -467,8 +465,8 @@ removeAllListeners() => Promise<void>
 | **`placementKey`** | <code>string</code>                                                         |                                                                                                                                                                             |
 | **`revision`**     | <code>number</code>                                                         | Published catalog revision this resolution came from.                                                                                                                       |
 | **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code>             |                                                                                                                                                                             |
-| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>               | Remote paywall render contract — your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key).           |
-| **`experiment`**   | <code><a href="#placementexperiment">PlacementExperiment</a> \| null</code> | Sticky experiment assignment for this customer; `null` when no running experiment covers the placement (older servers omit the key — every bridge normalizes that to null). |
+| **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>               | Remote paywall render contract: your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key).           |
+| **`experiment`**   | <code><a href="#placementexperiment">PlacementExperiment</a> \| null</code> | Sticky experiment assignment for this customer; `null` when no running experiment covers the placement (older servers omit the key; every bridge normalizes that to null). |
 
 
 #### PlacementOffering
@@ -499,13 +497,13 @@ removeAllListeners() => Promise<void>
 
 #### PaywallConfig
 
-Remote paywall design attached to a placement. Render contract — the app
+Remote paywall design attached to a placement. Render contract: the app
 draws this with its own components; prices still come from the store
 (StoreKit / Play Billing) so the display never disagrees with the charge.
 
 | Prop                     | Type                                                                                                                            | Description                                                                                                                                                                       |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`template`**           | <code>'focus' \| 'feature-list' \| 'minimal' \| 'hero' \| 'timeline' \| 'plans' \| 'feature-grid' \| 'offer' \| 'reveal'</code> | Layout — the screen structure to render. The dashboard's template gallery is presets over these layouts; the first three are the original templates and render exactly as before. |
+| **`template`**           | <code>'focus' \| 'feature-list' \| 'minimal' \| 'hero' \| 'timeline' \| 'plans' \| 'feature-grid' \| 'offer' \| 'reveal'</code> | Layout: the screen structure to render. The dashboard's template gallery is presets over these layouts; the first three are the original templates and render exactly as before. |
 | **`mode`**               | <code>'dark' \| 'light'</code>                                                                                                  | Color scheme the paywall renders in. Absent (legacy config) = dark.                                                                                                               |
 | **`headline`**           | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
 | **`subheadline`**        | <code>string</code>                                                                                                             |                                                                                                                                                                                   |
@@ -539,7 +537,7 @@ are set: stars/quote card above the packages, `count` under the CTA.
 | **`rating`** | <code>number</code> | 0–5; rendered as a star row.                      |
 | **`quote`**  | <code>string</code> |                                                   |
 | **`author`** | <code>string</code> |                                                   |
-| **`count`**  | <code>string</code> | e.g. "Join 2M+ users" — small line under the CTA. |
+| **`count`**  | <code>string</code> | e.g. "Join 2M+ users"; small line under the CTA. |
 
 
 #### PaywallOffer
@@ -571,7 +569,7 @@ terms/privacy handler.
 #### PlacementExperiment
 
 A/B experiment assignment (REV-219). The served `offering`/`paywall` are
-already the assigned variant's — this is attribution metadata, not
+already the assigned variant's; this is attribution metadata, not
 something the app needs to branch on.
 
 | Prop            | Type                |
@@ -611,6 +609,8 @@ Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 </docgen-api>
