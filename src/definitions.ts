@@ -248,8 +248,26 @@ export interface RevnixPlugin {
   registerInstall(options?: { platform?: string; appVersion?: string }): Promise<void>;
 
   /** Fire-and-forget paywall impression. Call when the paywall becomes
-   *  visible, not when you start loading it. */
-  logPaywallShown(options?: { placementKey?: string; paywallId?: string }): Promise<void>;
+   *  visible, not when you start loading it.
+   *
+   *  Resolves with the view id the beacon generated (REV-252), or undefined on
+   *  a host that predates close reporting. Hand that id to `logPaywallClosed`
+   *  when the customer dismisses THIS display: the two events sharing one view
+   *  id is what lets the ledger pair a close with the display it ended.
+   *  `renderRevnixPaywall` does all of this for you. */
+  logPaywallShown(options?: {
+    placementKey?: string;
+    paywallId?: string;
+  }): Promise<{ viewId?: string }>;
+
+  /** Fire-and-forget paywall dismissal (REV-252) — the other half of a
+   *  display's life. Idempotent per view id, exactly like the impression.
+   *  Pass the id `logPaywallShown` resolved with for this display. */
+  logPaywallClosed(options: {
+    viewId: string;
+    placementKey?: string;
+    paywallId?: string;
+  }): Promise<void>;
 
   /** Set attributes on the current customer. Attributes are what A/B-test
    *  audiences target; set `country`, `app_version`, `locale`, or any custom

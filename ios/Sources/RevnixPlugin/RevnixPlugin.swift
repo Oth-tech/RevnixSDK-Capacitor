@@ -29,6 +29,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "resolvePlacement", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "registerInstall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallShown", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
     ]
 
@@ -210,7 +211,25 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         let placementKey = call.getString("placementKey")
         let paywallId = call.getString("paywallId")
         Task {
-            await client.logPaywallShown(placementKey: placementKey, paywallId: paywallId)
+            // REV-252: resolves with the view id so the JS side can pair this
+            // display's close with it. An older JS caller ignores the field.
+            let viewId = await client.logPaywallDisplay(
+                placementKey: placementKey, paywallId: paywallId)
+            call.resolve(viewId.map { ["viewId": $0] } ?? [:])
+        }
+    }
+
+    @objc func logPaywallClosed(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let viewId = call.getString("viewId") else {
+            call.reject("viewId is required", "invalid")
+            return
+        }
+        let placementKey = call.getString("placementKey")
+        let paywallId = call.getString("paywallId")
+        Task {
+            await client.logPaywallClosed(
+                viewId: viewId, placementKey: placementKey, paywallId: paywallId)
             call.resolve()
         }
     }
