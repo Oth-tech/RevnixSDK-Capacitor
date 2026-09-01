@@ -117,6 +117,7 @@ handle.destroy(); // remove from the DOM when dismissed
 * [`resolvePlacement(...)`](#resolveplacement)
 * [`registerInstall(...)`](#registerinstall)
 * [`logPaywallShown(...)`](#logpaywallshown)
+* [`logPaywallClosed(...)`](#logpaywallclosed)
 * [`setAttributes(...)`](#setattributes)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`removeAllListeners()`](#removealllisteners)
@@ -323,15 +324,40 @@ handled automatically by configure.)
 ### logPaywallShown(...)
 
 ```typescript
-logPaywallShown(options?: { placementKey?: string | undefined; paywallId?: string | undefined; } | undefined) => Promise<void>
+logPaywallShown(options?: { placementKey?: string | undefined; paywallId?: string | undefined; } | undefined) => Promise<{ viewId?: string; }>
 ```
 
 Fire-and-forget paywall impression. Call when the paywall becomes
 visible, not when you start loading it.
 
+Resolves with the view id the beacon generated (REV-252), or undefined on
+a host that predates close reporting. Hand that id to `logPaywallClosed`
+when the customer dismisses THIS display: the two events sharing one view
+id is what lets the ledger pair a close with the display it ended.
+`renderRevnixPaywall` does all of this for you.
+
 | Param         | Type                                                        |
 | ------------- | ----------------------------------------------------------- |
 | **`options`** | <code>{ placementKey?: string; paywallId?: string; }</code> |
+
+**Returns:** <code>Promise&lt;{ viewId?: string; }&gt;</code>
+
+--------------------
+
+
+### logPaywallClosed(...)
+
+```typescript
+logPaywallClosed(options: { viewId: string; placementKey?: string; paywallId?: string; }) => Promise<void>
+```
+
+Fire-and-forget paywall dismissal (REV-252) — the other half of a
+display's life. Idempotent per view id, exactly like the impression.
+Pass the id `logPaywallShown` resolved with for this display.
+
+| Param         | Type                                                                        |
+| ------------- | --------------------------------------------------------------------------- |
+| **`options`** | <code>{ viewId: string; placementKey?: string; paywallId?: string; }</code> |
 
 --------------------
 

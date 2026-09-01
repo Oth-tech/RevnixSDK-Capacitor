@@ -91,10 +91,20 @@ export interface BlockStyle {
   overflow?: 'hidden' | 'visible';
 }
 
+/** What tapping a block does. Omitted means the block is decoration.
+ *
+ *  A FIELD on the existing block types rather than a new block type, so an SDK
+ *  older than this one drops it and still renders the element exactly as it
+ *  does today — a design carrying a close chip degrades to inert rather than
+ *  losing the chip, which is what a new block type would have cost. */
+export type BlockAction = 'close';
+
 export interface TextBlock {
   id: string;
   type: 'text';
   text: string;
+  /** Tapping this block dismisses the paywall. See BlockAction. */
+  action?: BlockAction;
   style?: BlockStyle;
 }
 
@@ -105,6 +115,8 @@ export interface ImageBlock {
   shape?: 'rect' | 'circle';
   fit?: 'cover' | 'contain';
   placeholder?: string;
+  /** Tapping this block dismisses the paywall. See BlockAction. */
+  action?: BlockAction;
   style?: BlockStyle;
 }
 
@@ -133,6 +145,9 @@ export interface ButtonBlock {
   id: string;
   type: 'button';
   label: string;
+  /** `close` turns this button into a dismiss ("Not now") instead of the
+   *  purchase CTA, which is what a button means by default. */
+  action?: BlockAction;
   style?: BlockStyle;
 }
 
@@ -760,6 +775,9 @@ export interface BlockRenderContext {
   /** Reports a plan card tap. Selection is the paywall's own state, so a
    *  design's plan cards work without the host wiring anything. */
   onSelect?: (packageId: string) => void;
+  /** Dismissal (REV-252). Omitted means no close is drawn at all — a dead
+   *  close button is worse than none. */
+  onClose?: () => void;
 }
 
 /**
@@ -779,6 +797,47 @@ function makeSelectable(node: HTMLElement, ctx: BlockRenderContext, packageId: s
   if (!ctx.onSelect) return;
   node.style.cursor = 'pointer';
   node.addEventListener('click', () => ctx.onSelect?.(packageId));
+}
+
+/**
+ * Makes an element the paywall's dismiss target when the design marks it as
+ * one (REV-252). A block with no close action gets no listener at all, so it
+ * never intercepts a tap meant for what sits behind it.
+ */
+function makeClosable(node: HTMLElement, ctx: BlockRenderContext, action: BlockAction | undefined): void {
+  if (action !== 'close' || !ctx.onClose) return;
+  node.style.cursor = 'pointer';
+  node.setAttribute('role', 'button');
+  node.setAttribute('aria-label', 'Close');
+  node.addEventListener('click', (event) => {
+    // Consumes its own tap: a close chip pinned over a plan card would
+    // otherwise also bubble into that card's selection handler.
+    event.stopPropagation();
+    ctx.onClose?.();
+  });
+}
+
+/**
+ * Does this tree author its own dismiss affordance?
+ *
+ * The renderer draws its own close button only when this is false, so a design
+ * published before close existed becomes dismissible without being
+ * re-authored, and a design that DOES author a close chip never shows two. The
+ * same predicate exists in every Revnix SDK — keep them identical.
+ *
+ * Conditional containers are deliberately not searched: a `repeat` card
+ * renders once per package (none, when the offering is empty) and a
+ * `packageIndex` card is hidden when the offering does not reach that index,
+ * so a close authored inside one MIGHT not appear. Counting it would suppress
+ * the fallback and leave the customer with no way out — the exact bug this
+ * feature exists to fix.
+ */
+export function hasCloseAction(blocks: PaywallBlock[]): boolean {
+  return blocks.some((b) =>
+    b.type === 'card'
+      ? b.repeat === undefined && b.packageIndex === undefined && hasCloseAction(b.children)
+      : (b.type === 'text' || b.type === 'image' || b.type === 'button') && b.action === 'close',
+  );
 }
 
 function div(doc: Document, tag = 'div'): HTMLElement {
@@ -818,6 +877,7 @@ export function renderBlock(
       if (s?.items !== undefined || s?.justify !== undefined) node.style.display = 'flex';
       applyBlockStyle(node, s, doc);
       node.textContent = resolveTags(String(block.text ?? ''), pkg, packages);
+      makeClosable(node, ctx, block.action);
       return node;
     }
 
@@ -857,6 +917,7 @@ export function renderBlock(
         slot.textContent = block.placeholder ?? 'image';
         node.appendChild(slot);
       }
+      makeClosable(node, ctx, block.action);
       return node;
     }
 
@@ -907,8 +968,12 @@ export function renderBlock(
       // A converted CTA sizes itself with an explicit height and centers with
       // flex; the padded default is only for buttons added by hand.
       const sized = block.style?.height !== undefined;
-      node.style.background = doc.accent;
-      node.style.color = doc.accentInk;
+      // A button the design marks as the close dismisses instead of buying,
+      // and takes no accent fill: the CTA must stay the one accented thing on
+      // the screen, or a "Not now" competes with "Subscribe" for the eye.
+      const closes = block.action === 'close' && ctx.onClose !== undefined;
+      node.style.background = closes ? 'transparent' : doc.accent;
+      node.style.color = closes ? doc.textColor : doc.accentInk;
       node.style.borderRadius = '12px';
       node.style.border = 'none';
       node.style.padding = sized ? '0 16px' : '15px 16px';
@@ -922,7 +987,9 @@ export function renderBlock(
       node.style.font = node.style.font || '';
       applyBlockStyle(node, block.style, doc);
       node.textContent = resolveTags(String(block.label ?? ''), pkg, packages);
-      if (ctx.onPurchase) {
+      if (closes) {
+        makeClosable(node, ctx, block.action);
+      } else if (ctx.onPurchase) {
         node.addEventListener('click', (event) => {
           // Consumes its own tap, the way RN's Pressable does. A CTA sitting
           // inside a plan card would otherwise also bubble to the card's
@@ -1257,6 +1324,17 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     if (rendered) body.appendChild(rendered);
   }
 
+  // REV-252: the dismiss affordance the renderer supplies itself, drawn only
+  // when the design authors none of its own and the host wired an onClose.
+  // That rule is what makes every paywall published before close existed
+  // dismissible without being re-authored, while a design that DOES carry a
+  // close chip never ends up showing two.
+  //
+  // Appended to the SCREEN rather than the body so it sits outside the canvas
+  // scale transform, keeping its tap size and its distance from the screen
+  // edge whatever the device width does to the design.
+  const closeChip = fallbackClose(ctx, document);
+
   if (doc.layout === 'canvas') {
     // Laid out at 1× and scaled, so absolute placement inside `stack`
     // containers stays true at any width. The converted designs were drawn
@@ -1281,6 +1359,7 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
       body.style.transform = `scale(${scale})`;
       screen.style.height = `${DESIGN_CANVAS.height * scale}px`;
     };
+    if (closeChip) screen.appendChild(closeChip);
     fit();
     // The container is often laid out after this returns (a freshly appended
     // overlay measures 0), so re-fit when it gets a size. ResizeObserver is
@@ -1297,5 +1376,41 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     body.style.zIndex = '1';
   }
   screen.appendChild(body);
+  if (closeChip) {
+    // The chip is absolutely positioned, so the flow screen has to be its
+    // containing block even when there is no background art to make it one.
+    screen.style.position = 'relative';
+    screen.appendChild(closeChip);
+  }
   return screen;
+}
+
+/**
+ * The renderer's own close chip, or null when it should not draw one.
+ *
+ * Deliberately plain: it is a safety net, not a design element. Tinted from
+ * the screen's own ink rather than a fixed white, so it stays legible on a
+ * light design as well as a dark one.
+ */
+function fallbackClose(ctx: BlockRenderContext, document: Document): HTMLElement | null {
+  const { onClose, doc } = ctx;
+  if (!onClose || hasCloseAction(doc.blocks)) return null;
+  const node = div(document, 'button');
+  (node as HTMLButtonElement).type = 'button';
+  node.setAttribute('aria-label', 'Close');
+  node.textContent = '\u00d7';
+  node.style.cssText =
+    'position:absolute;top:14px;right:14px;z-index:50;width:30px;height:30px;' +
+    'display:flex;align-items:center;justify-content:center;border:none;border-radius:999px;' +
+    'font-size:17px;line-height:1;cursor:pointer;padding:0';
+  node.style.color = doc.textColor;
+  // color-mix keeps the wash tied to the design's ink; a WebView too old for
+  // it falls back to the transparent default, leaving a bare glyph that is
+  // still tappable.
+  node.style.background = `color-mix(in srgb, ${doc.textColor} 14%, transparent)`;
+  node.addEventListener('click', (event) => {
+    event.stopPropagation();
+    onClose();
+  });
+  return node;
 }

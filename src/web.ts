@@ -130,8 +130,38 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     // Handled by configure() via revnix-react's reportInstalls.
   }
 
-  async logPaywallShown(options?: { placementKey?: string; paywallId?: string }): Promise<void> {
-    this.require().logPaywallShown(options);
+  async logPaywallShown(options?: {
+    placementKey?: string;
+    paywallId?: string;
+  }): Promise<{ viewId?: string }> {
+    // REV-252 version skew: this package pins revnix-react ^0.12.0, whose
+    // logPaywallShown returns void. A newer one returns the view id. Read
+    // whatever comes back rather than assuming — on the old dependency the
+    // close is still reported, it just cannot be paired with its display.
+    // Removable, like the setAttributes shim below, once the dependency is
+    // bumped to a revnix-react that returns the id.
+    const viewId = this.require().logPaywallShown(options) as unknown;
+    return typeof viewId === 'string' ? { viewId } : {};
+  }
+
+  async logPaywallClosed(options: {
+    viewId: string;
+    placementKey?: string;
+    paywallId?: string;
+  }): Promise<void> {
+    // Same skew: absent on revnix-react 0.12.0, so feature-detected rather
+    // than called blind. A missing method costs the CLOSE EVENT, never the
+    // dismissal — the paywall has already closed by the time this runs.
+    const client = this.require() as unknown as {
+      logPaywallClosed?: (
+        viewId: string,
+        options?: { placementKey?: string; paywallId?: string },
+      ) => void;
+    };
+    client.logPaywallClosed?.(options.viewId, {
+      placementKey: options.placementKey,
+      paywallId: options.paywallId,
+    });
   }
 
   // REV-033 v2: revnix-react 0.12.0 has no setAttributes, so this posts the

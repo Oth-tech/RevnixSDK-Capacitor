@@ -444,3 +444,132 @@ describe('canvas documents', () => {
     assert.equal(body.style.lineHeight, 'normal');
   });
 });
+
+// REV-252: the close affordance. Two mechanisms with one rule between them —
+// a design MAY mark an element `action: "close"`, and the renderer supplies a
+// close of its own ONLY when the design marks none. Exercised through the
+// real DOM because the wiring that matters (the click listener, the pinned
+// chip, the tap not bubbling into a plan card) only exists once rendered.
+describe('close affordance', () => {
+  const TEXT = { id: 'b1', type: 'text', text: 'Go Pro' };
+  const fallbackOf = (screen) => screen.querySelector('[aria-label="Close"]');
+
+  test('a design authoring no close gets one from the renderer', () => {
+    const screen = render([TEXT], { onClose: () => {} });
+    assert.ok(fallbackOf(screen), 'expected the renderer to supply a close');
+  });
+
+  test('no onClose means no close is drawn at all', () => {
+    // A dead close button is worse than none: the host performs dismissal, so
+    // without a handler there is nothing the chip could do.
+    assert.equal(fallbackOf(render([TEXT])), null);
+  });
+
+  test('a design authoring its own close gets no second one', () => {
+    const screen = render(
+      [TEXT, { id: 'x', type: 'text', text: '×', action: 'close' }],
+      { onClose: () => {} },
+    );
+    // The authored chip carries the aria-label too, so count the pinned one.
+    assert.equal(screen.querySelectorAll('button[aria-label="Close"]').length, 0);
+  });
+
+  test('an authored close nested in a card still suppresses the fallback', () => {
+    const screen = render(
+      [
+        {
+          id: 'c',
+          type: 'card',
+          layout: 'stack',
+          children: [{ id: 'x', type: 'text', text: '×', action: 'close' }],
+        },
+      ],
+      { onClose: () => {} },
+    );
+    assert.equal(screen.querySelectorAll('button[aria-label="Close"]').length, 0);
+  });
+
+  test('the renderer-supplied chip dismisses when clicked', () => {
+    let closed = 0;
+    const screen = render([TEXT], { onClose: () => { closed += 1; } });
+    fallbackOf(screen).dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    assert.equal(closed, 1);
+  });
+
+  test('an authored close element dismisses when clicked', () => {
+    let closed = 0;
+    const screen = render(
+      [{ id: 'x', type: 'text', text: '×', action: 'close' }],
+      { onClose: () => { closed += 1; } },
+    );
+    screen.querySelector('[aria-label="Close"]')
+      .dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    assert.equal(closed, 1);
+  });
+
+  test('a close inside a plan card does not also select that plan', () => {
+    // The chip consumes its own tap. Without that, dismissing from a card
+    // would move the selection on the way out.
+    let closed = 0;
+    const selected = [];
+    const screen = render(
+      [
+        {
+          id: 'card',
+          type: 'card',
+          layout: 'stack',
+          packageIndex: 0,
+          children: [{ id: 'x', type: 'text', text: '×', action: 'close' }],
+        },
+      ],
+      { onClose: () => { closed += 1; }, onSelect: (id) => selected.push(id) },
+    );
+    screen.querySelector('[aria-label="Close"]')
+      .dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    assert.equal(closed, 1);
+    assert.deepEqual(selected, []);
+  });
+
+  test('a button marked close dismisses instead of purchasing', () => {
+    let closed = 0;
+    const purchased = [];
+    const screen = render(
+      [{ id: 'b', type: 'button', label: 'Not now', action: 'close' }],
+      { onClose: () => { closed += 1; }, onPurchase: (id) => purchased.push(id) },
+    );
+    const button = screen.querySelector('button');
+    button.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+    assert.equal(closed, 1);
+    assert.deepEqual(purchased, [], 'a dismiss must never charge');
+    // And it drops the accent fill, so it cannot compete with the real CTA.
+    assert.equal(button.style.background, 'transparent');
+  });
+
+  test('a close inside a conditional card does not suppress the fallback', () => {
+    // A `repeat` card renders once per package (none, on an empty offering)
+    // and a `packageIndex` card is hidden when the offering does not reach
+    // that index — so a close inside one MIGHT not render. Suppressing on it
+    // would leave the customer with no way out, the exact bug this fixes.
+    const close = { id: 'x', type: 'text', text: 'X', action: 'close' };
+    for (const card of [
+      { id: 'c', type: 'card', repeat: 'packages', children: [close] },
+      { id: 'c', type: 'card', packageIndex: 5, children: [close] },
+    ]) {
+      const screen = render([card], { onClose: () => {} });
+      assert.ok(fallbackOf(screen), 'a conditional close must not suppress the fallback');
+    }
+    // A plain card is unconditional, so its close DOES suppress.
+    const plain = render([{ id: 'c', type: 'card', children: [close] }], { onClose: () => {} });
+    assert.equal(plain.querySelectorAll('button[aria-label="Close"]').length, 0);
+  });
+
+  test('an unknown action value leaves the element decorative', () => {
+    // Forward compatibility both ways: a future action this SDK does not know
+    // must not be mistaken for a close, and must not suppress the fallback.
+    const screen = render(
+      [{ id: 't', type: 'text', text: '?', action: 'purchase' }],
+      { onClose: () => {} },
+    );
+    assert.ok(fallbackOf(screen), 'an unknown action must not suppress the fallback');
+  });
+});

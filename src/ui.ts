@@ -99,13 +99,35 @@ export interface RevnixPaywallOptions {
   onRestore?: () => void;
   onTerms?: () => void;
   onPrivacy?: () => void;
+  /** Called when the customer dismisses the paywall (REV-252) — either by
+   *  tapping an element the design marks as the close, or by the close button
+   *  the renderer supplies when the design authors none.
+   *
+   *  Dismissal is the HOST's to perform: the paywall does not tear itself
+   *  down, because only the host knows whether that means closing a modal,
+   *  navigating away, or advancing onboarding. The usual body is a call to
+   *  this handle's own `destroy()`. Omit it and no close is drawn at all — a
+   *  paywall with a dead close button is worse than one without.
+   *
+   *  Passing `client` as well reports `paywall.closed` against this display's
+   *  own view id, so the close pairs with its paywall.viewed. */
+  onClose?: () => void;
   theme?: Partial<RevnixPaywallTheme>;
   /** When given, the paywall reports one paywall.viewed per render-mount
    *  (REV-094) — the analytics funnel's "Paywall displayed" stage. The
    *  `Revnix` plugin satisfies this shape; structural typing keeps this
    *  entrypoint free of a hard plugin import. */
   client?: {
-    logPaywallShown: (options?: { placementKey?: string; paywallId?: string }) => void | Promise<void>;
+    logPaywallShown: (options?: {
+      placementKey?: string;
+      paywallId?: string;
+    }) => void | Promise<void | { viewId?: string }>;
+    /** Older clients predate close reporting; the paywall still closes. */
+    logPaywallClosed?: (options: {
+      viewId: string;
+      placementKey?: string;
+      paywallId?: string;
+    }) => void | Promise<void>;
   };
   /** Placement/paywall attribution attached to the view report. */
   placementKey?: string;
@@ -163,8 +185,46 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     // fire-and-forget beacon — a failed delivery never breaks the paywall.
     const { client, placementKey, paywallId, disableViewTracking } = options;
     if (client && !disableViewTracking) {
-      void Promise.resolve(client.logPaywallShown({ placementKey, paywallId })).catch(() => undefined);
+      this.viewReport = Promise.resolve(client.logPaywallShown({ placementKey, paywallId }))
+        .then((result) => {
+          // A client that predates REV-252 resolves with void; the close then
+          // still fires the host callback, it just cannot be paired with this
+          // display.
+          const id = (result as { viewId?: string } | void)?.viewId;
+          return typeof id === 'string' ? id : undefined;
+        })
+        .catch(() => undefined);
     }
+  }
+
+  /** The in-flight view beacon (REV-252). The close AWAITS this rather than
+   *  reading an id off a field: the id only exists once the request returns,
+   *  and a customer who dismisses in that window — a slow link, a paywall they
+   *  never meant to open — would otherwise report a close with no id and lose
+   *  the pairing. */
+  private viewReport?: Promise<string | undefined>;
+
+  /**
+   * Runs the host's dismissal, reporting `paywall.closed` alongside it
+   * (REV-252). The host's callback runs FIRST and unconditionally: the beacon
+   * is best-effort, and an analytics failure must never be able to trap the
+   * customer on the screen. The host usually responds by calling `destroy()`.
+   */
+  private close(): void {
+    this.options.onClose?.();
+    const { client, placementKey, paywallId, disableViewTracking } = this.options;
+    const report = this.viewReport;
+    if (!client?.logPaywallClosed || disableViewTracking || report === undefined) return;
+    // Awaiting the view beacon is what keeps the pair intact when the customer
+    // dismisses before it lands. It has usually settled long ago, in which
+    // case this continues on the next microtask.
+    void report
+      .then((viewId) =>
+        viewId === undefined
+          ? undefined
+          : client.logPaywallClosed?.({ viewId, placementKey, paywallId }),
+      )
+      .catch(() => undefined);
   }
 
   update(options: Partial<RevnixPaywallOptions>): void {
@@ -220,11 +280,15 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           onPrivacy: o.onPrivacy,
           onPurchase: o.loading ? undefined : (packageId) => o.onPurchase(packageId),
           onSelect: (packageId) => this.select(packageId),
+          onClose: o.onClose ? () => this.close() : undefined,
         },
         doc,
       );
     } catch {
+      // A malformed tree costs the DESIGN, not the close: the classic layout
+      // that replaces it still needs a way out.
       this.renderClassic();
+      this.syncClassicClose(true);
       return;
     }
 
@@ -235,6 +299,55 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
       this.scrollContent.appendChild(next);
     }
     this.content = next;
+    // The designed tree draws its own close (renderBlockDoc can see the tree,
+    // so it knows whether to). Clear any chip a previous classic render left,
+    // or an update() that swapped in a block config would show two.
+    this.syncClassicClose(false);
+  }
+
+  /** The classic layouts' own close chip, so re-renders replace rather than
+   *  stack it (REV-252). */
+  private classicClose?: HTMLElement;
+
+  /**
+   * The dismiss affordance the classic layouts get.
+   *
+   * The nine `template` layouts have the same problem the designed ones had —
+   * nothing on the screen closes them — and `onClose` is an option of the
+   * shared paywall, so a host that wires it must get a close on either path
+   * rather than silently nothing. Classic layouts author no elements of their
+   * own, so there is never a design chip to suppress: the rule reduces to
+   * "draw it whenever the host wired a handler".
+   *
+   * The designed path draws its own (inside renderBlockDoc, where it can see
+   * the tree), so this is skipped there or the screen would show two.
+   */
+  private syncClassicClose(classic: boolean): void {
+    this.classicClose?.remove();
+    this.classicClose = undefined;
+    if (!classic || !this.options.onClose) return;
+
+    const doc = this.root.ownerDocument;
+    const theme: RevnixPaywallTheme = {
+      ...(this.options.config.mode === 'light' ? LIGHT_PAYWALL_THEME : DEFAULT_PAYWALL_THEME),
+      ...this.options.theme,
+    };
+    const node = doc.createElement('button');
+    node.type = 'button';
+    node.setAttribute('aria-label', 'Close');
+    node.textContent = '\u00d7';
+    node.style.cssText =
+      'position:absolute;top:14px;right:14px;z-index:50;width:30px;height:30px;' +
+      'display:flex;align-items:center;justify-content:center;border:none;border-radius:999px;' +
+      'font-size:17px;line-height:1;cursor:pointer;padding:0';
+    node.style.color = theme.textPrimary;
+    node.style.background = `color-mix(in srgb, ${theme.textPrimary} 14%, transparent)`;
+    node.addEventListener('click', (event) => {
+      event.stopPropagation();
+      this.close();
+    });
+    this.root.appendChild(node);
+    this.classicClose = node;
   }
 
   private render(): void {
@@ -245,10 +358,14 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     // before the block builder — so anything already live renders unchanged.
     const blockDoc = asBlockDoc(config.blocks);
     if (blockDoc) {
+      // renderBlocks falls back to the classic layout when the tree throws, so
+      // it owns the decision — it is the only place that knows which renderer
+      // actually drew.
       this.renderBlocks(blockDoc);
       return;
     }
     this.renderClassic();
+    this.syncClassicClose(true);
   }
 
   private renderClassic(): void {

@@ -231,7 +231,32 @@ class RevnixPlugin : Plugin() {
         val placementKey = call.getString("placementKey")
         val paywallId = call.getString("paywallId")
         scope.launch {
-            active.logPaywallShown(placementKey = placementKey, paywallId = paywallId)
+            // REV-252: resolves with the view id so the JS side can pair this
+            // display's close with it. An older JS caller ignores the field.
+            val viewId = active.logPaywallDisplay(
+                placementKey = placementKey,
+                paywallId = paywallId,
+            )
+            call.resolve(JSObject().put("viewId", viewId))
+        }
+    }
+
+    @PluginMethod
+    fun logPaywallClosed(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val viewId = call.getString("viewId")
+        if (viewId == null) {
+            call.reject("viewId is required", "invalid")
+            return
+        }
+        val placementKey = call.getString("placementKey")
+        val paywallId = call.getString("paywallId")
+        scope.launch {
+            active.logPaywallClosed(
+                viewId = viewId,
+                placementKey = placementKey,
+                paywallId = paywallId,
+            )
             call.resolve()
         }
     }
