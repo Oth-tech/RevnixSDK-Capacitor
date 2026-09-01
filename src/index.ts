@@ -13,4 +13,25 @@ const Revnix = registerPlugin<RevnixPlugin>('Revnix', {
 
 export * from './definitions';
 export * from './ui';
+// The designed-paywall renderer. `renderRevnixPaywall` uses it automatically
+// when a config carries `blocks`; these are exported for hosts that render a
+// block document themselves, and for `minorUnitsForCurrency`, which a host
+// needs to convert a store price into the minor units the tags read.
+export type {
+  BlockPackage,
+  BlockRenderContext,
+  BlockStyle,
+  ButtonBlock,
+  CardBlock,
+  ImageBlock,
+  LineBlock,
+  LinksBlock,
+  ListBlock,
+  PaywallBlock,
+  PaywallBlockDoc,
+  ProductsBlock,
+  SpacerBlock,
+  TextBlock,
+} from './blocks';
+export { asBlockDoc, minorUnitsForCurrency, renderBlockDoc, resolveTags } from './blocks';
 export { Revnix };

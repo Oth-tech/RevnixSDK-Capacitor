@@ -148,6 +148,13 @@ export interface PaywallConfig {
   review?: PaywallReview;
   offer?: PaywallOffer;
   footer?: PaywallFooter;
+  /** A designed paywall: the block tree the dashboard's builder authored.
+   *  When present `renderRevnixPaywall` renders THIS and the fields above act
+   *  as the fallback for clients that predate block rendering — so an app on
+   *  an older SDK keeps showing a sane classic screen instead of nothing.
+   *  Typed as `PaywallBlockDoc` in the renderer; opaque here so a consumer
+   *  that only reads the config pulls in no renderer types. */
+  blocks?: unknown;
 }
 
 export interface PlacementPaywall {

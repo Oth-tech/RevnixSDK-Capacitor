@@ -22,12 +22,24 @@
 // overlay is the usual shape); the paywall fills it and scrolls internally.
 
 import type { PaywallConfig } from './definitions';
+import { asBlockDoc, renderBlockDoc } from './blocks';
+import type { PaywallBlockDoc } from './blocks';
 
 /** One purchasable row. `priceLabel` must come from the store (localized). */
 export interface RevnixPaywallPackage {
   packageId: string;
   title: string;
   priceLabel: string;
+  /** Renewal cycle from the product ("annual", "monthly", "weekly", …).
+   *  Drives the {period} / {period_short} tags on a designed paywall; absent
+   *  for lifetime and one-time products. */
+  period?: string;
+  /** The store's price in MINOR units, with its currency — what
+   *  {price_per_month} and {save_percent} are computed from. Omit them and
+   *  those tags stay visible rather than resolving to a wrong number; see
+   *  `minorUnitsForCurrency` before converting from major units. */
+  amountMinor?: number;
+  currency?: string;
 }
 
 /** Colors the paywall renders with. Defaults mirror the dashboard preview
@@ -173,7 +185,72 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     this.render();
   }
 
+  /**
+   * Mounts a designed paywall. Kept separate from the classic renderer so the
+   * two never entangle: a block document ignores `template`, the feature
+   * bullets and the theme entirely — the design carries its own palette.
+   *
+   * Wrapped so a malformed document costs the paywall its DESIGN, not the
+   * purchase: if the tree throws, the classic layout renders instead, which
+   * is a working screen the customer can still buy from.
+   */
+  private renderBlocks(blockDoc: PaywallBlockDoc): void {
+    const o = this.options;
+    const doc = this.root.ownerDocument;
+    const shown = o.packages;
+    const fallbackSelected: string | undefined =
+      shown.find((p) => p.packageId === o.config.highlightPackageId)?.packageId ?? shown[0]?.packageId;
+    const selectedId =
+      o.selectedPackageId ??
+      (this.internalSelected !== undefined && shown.some((p) => p.packageId === this.internalSelected)
+        ? this.internalSelected
+        : fallbackSelected);
+
+    let next: HTMLDivElement;
+    try {
+      next = renderBlockDoc(
+        {
+          doc: blockDoc,
+          packages: shown,
+          highlightPackageId: selectedId,
+          heroImageUrl: o.config.heroImageUrl,
+          footer: { termsUrl: o.config.footer?.termsUrl, privacyUrl: o.config.footer?.privacyUrl },
+          onRestore: o.onRestore,
+          onTerms: o.onTerms,
+          onPrivacy: o.onPrivacy,
+          onPurchase: o.loading || selectedId === undefined ? undefined : () => o.onPurchase(selectedId),
+        },
+        doc,
+      );
+    } catch {
+      this.renderClassic();
+      return;
+    }
+
+    this.root.style.backgroundColor = '';
+    if (this.content) {
+      this.content.replaceWith(next);
+    } else {
+      this.scrollContent.appendChild(next);
+    }
+    this.content = next;
+  }
+
   private render(): void {
+    const { config } = this.options;
+
+    // Precedence: a designed paywall (`config.blocks`) wins over the classic
+    // layouts below, which stay the fallback for every paywall published
+    // before the block builder — so anything already live renders unchanged.
+    const blockDoc = asBlockDoc(config.blocks);
+    if (blockDoc) {
+      this.renderBlocks(blockDoc);
+      return;
+    }
+    this.renderClassic();
+  }
+
+  private renderClassic(): void {
     const o = this.options;
     const { config, packages, loading } = o;
     const doc = this.root.ownerDocument;
