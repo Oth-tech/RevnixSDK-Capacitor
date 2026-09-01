@@ -293,21 +293,111 @@ export function withAlpha(color: string, alpha: number): string {
   return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${Math.round(a * 1000) / 1000})`;
 }
 
-/** The screen background as a flat color — the base layer of a gradient, or
- *  the ground color of the layered background spec. */
-export function backgroundBaseColor(background: unknown): string {
-  if (typeof background === 'string') {
-    const hex = background.match(/#[0-9a-fA-F]{3,8}\b/);
-    if (hex) return hex[0];
-    const fn = background.match(/rgba?\([^)]+\)/i);
-    if (fn) return fn[0];
-    return background;
-  }
+/** How a background photo fills the screen. */
+export type BackgroundFit = 'cover' | 'contain';
+
+export interface BackgroundImage {
+  /** An https URL the device can load — Convex storage or any CDN. */
+  url: string;
+  /** Default "cover". */
+  fit?: BackgroundFit;
+  /** Focal point in percent (0-100, 50/50 = centred): the part of the photo
+   *  that must survive a cover-crop. */
+  focalX?: number;
+  focalY?: number;
+  /** 0-100, default 100. */
+  opacity?: number;
+  /** Gaussian blur radius in px. */
+  blur?: number;
+}
+
+export interface BackgroundOverlay {
+  /** Any CSS color or gradient, painted over the photo. */
+  fill: string;
+  /** 0-100, default 100. */
+  opacity?: number;
+}
+
+/**
+ * The layered background, as the dashboard writes it.
+ *
+ * The ground field is `color`. It is NOT `ground` — that is the name of the
+ * RESOLVED layer this SDK paints, and reading it off the wire was the bug
+ * that rendered every edited paywall black. `ground` stays accepted so a
+ * document published by a build that wrote it still opens.
+ */
+export interface PaywallBackgroundSpec {
+  color?: string;
+  /** @deprecated Never written by the dashboard; read for safety only. */
+  ground?: string;
+  image?: BackgroundImage;
+  overlay?: BackgroundOverlay;
+  /** Builder bookkeeping; ignored on device. */
+  presetId?: string;
+  original?: unknown;
+}
+
+export type PaywallBackground = string | PaywallBackgroundSpec;
+
+const DEFAULT_GROUND = '#000000';
+
+/** The wire value as a spec. A plain string is the legacy ground. */
+function backgroundSpec(background: unknown): PaywallBackgroundSpec {
+  if (typeof background === 'string') return { color: background };
   if (typeof background === 'object' && background !== null) {
-    const ground = (background as { ground?: unknown }).ground;
-    if (typeof ground === 'string') return backgroundBaseColor(ground);
+    return background as PaywallBackgroundSpec;
   }
-  return '#000000';
+  return {};
+}
+
+/** The ground paint of a background: `color`, or the legacy `ground`. */
+function groundOf(background: unknown): string | undefined {
+  const spec = backgroundSpec(background);
+  const value = spec.color ?? spec.ground;
+  return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/**
+ * The screen background as a flat color — what paints UNDER the gradient, so
+ * a form the gradient parser does not understand still shows a color from the
+ * design rather than black.
+ *
+ * It reads the LAST comma-separated layer, because in CSS the first-listed
+ * layer paints on TOP: taking the first color would answer with the
+ * translucent accent glow the library's Spotlight and Corner halo presets
+ * stack over their base, not with the base itself. Fully transparent stops are
+ * skipped for the same reason — a scrim that fades to `…00` says nothing about
+ * the ground under it.
+ */
+export function backgroundBaseColor(background: unknown): string {
+  const ground = groundOf(background);
+  if (ground === undefined) return DEFAULT_GROUND;
+  const layers = splitTopLevel(ground);
+  const bottom = layers.length > 0 ? layers[layers.length - 1] : ground;
+  const colors = bottom.match(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/gi);
+  if (!colors) return ground;
+  return colors.find((color) => (toRgb(color)?.a ?? 1) > 0) ?? colors[0];
+}
+
+/** Splits on top-level commas only, so the commas inside `rgba(...)` and
+ *  inside a gradient's argument list do not tear a layer in half. */
+function splitTopLevel(input: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < input.length; i++) {
+    const c = input[i];
+    if (c === '(') depth++;
+    else if (c === ')') { if (depth > 0) depth--; }
+    else if (c === ',' && depth === 0) {
+      const piece = input.slice(start, i).trim();
+      if (piece) out.push(piece);
+      start = i + 1;
+    }
+  }
+  const tail = input.slice(start).trim();
+  if (tail) out.push(tail);
+  return out;
 }
 
 /** Expands palette tokens in a color string and applies any `/pct` alpha. */
@@ -327,16 +417,96 @@ export function resolveColor(value: string | undefined, doc: PaywallBlockDoc): s
   });
 }
 
-/** The screen background as a CSS `background` value. A layered spec becomes
- *  its ground; the photo layer is the host app's own asset and is painted by
- *  the image URL when one is published. */
+/** The screen background's ground layer as a CSS `background` value. The
+ *  photo and scrim are separate boxes — see `backgroundLayers`. */
 export function backgroundCss(background: unknown): string {
-  if (typeof background === 'string') return background;
-  if (typeof background === 'object' && background !== null) {
-    const ground = (background as { ground?: unknown }).ground;
-    if (typeof ground === 'string') return ground;
+  return groundOf(background) ?? DEFAULT_GROUND;
+}
+
+export interface ResolvedBackgroundImage {
+  url: string;
+  fit: BackgroundFit;
+  focalX: number;
+  focalY: number;
+  /** CSS background-position / object-position ("50% 50%"). */
+  position: string;
+  /** 0-1. */
+  opacity: number;
+  /** px; absent when no blur was asked for. */
+  blur?: number;
+}
+
+export interface ResolvedBackgroundOverlay {
+  fill: string;
+  /** 0-1. */
+  opacity: number;
+}
+
+export interface BackgroundLayers {
+  /** CSS background value for the ground box, or undefined for none. */
+  ground?: string;
+  image?: ResolvedBackgroundImage;
+  overlay?: ResolvedBackgroundOverlay;
+}
+
+/** 0-100 (or undefined) -> 0-1, clamped. */
+function bgPct(value: unknown, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.min(1, Math.max(0, value / 100));
+}
+
+/** 0-100 (or undefined) -> a clamped percentage number. */
+function bgCoord(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 50;
+  return Math.min(100, Math.max(0, value));
+}
+
+/**
+ * The paint list for a background, bottom layer first: ground, then photo,
+ * then scrim. Layers that would draw nothing (no url, zero opacity) are
+ * dropped, so a legacy string resolves to exactly one ground layer.
+ *
+ * Mirrors revnix-app/src/lib/paywall-blocks/background.ts and the React
+ * SDK's blocks/background.ts — same names, same defaults, same clamping.
+ */
+export function backgroundLayers(
+  background: unknown,
+  /** Resolves palette tokens in the ground and overlay fills. */
+  resolve: (value: string) => string = (v) => v,
+): BackgroundLayers {
+  const spec = backgroundSpec(background);
+  const layers: BackgroundLayers = {};
+
+  const ground = groundOf(background);
+  if (ground !== undefined) layers.ground = resolve(ground);
+
+  const image = spec.image;
+  if (image && typeof image.url === 'string' && image.url !== '') {
+    const opacity = bgPct(image.opacity, 1);
+    if (opacity > 0) {
+      const focalX = bgCoord(image.focalX);
+      const focalY = bgCoord(image.focalY);
+      layers.image = {
+        url: image.url,
+        fit: image.fit === 'contain' ? 'contain' : 'cover',
+        focalX,
+        focalY,
+        position: `${focalX}% ${focalY}%`,
+        opacity,
+        ...(typeof image.blur === 'number' && image.blur > 0 ? { blur: image.blur } : {}),
+      };
+    }
   }
-  return '#000000';
+
+  const overlay = spec.overlay;
+  if (overlay && typeof overlay.fill === 'string' && overlay.fill !== '') {
+    const opacity = bgPct(overlay.opacity, 1);
+    if (opacity > 0) {
+      layers.overlay = { fill: resolve(overlay.fill), opacity };
+    }
+  }
+
+  return layers;
 }
 
 // ——— tag variables ———
@@ -945,6 +1115,66 @@ function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document:
 }
 
 /**
+ * The screen background's photo and scrim as absolutely-positioned boxes,
+ * bottom layer first. The ground is painted on the screen element itself, so
+ * an unedited paywall (a plain string background) produces no boxes at all
+ * and renders byte-identically to before.
+ */
+function backgroundArt(layers: BackgroundLayers, document: Document): HTMLDivElement[] {
+  const out: HTMLDivElement[] = [];
+  const fill = (node: HTMLElement) => {
+    node.style.position = 'absolute';
+    node.style.inset = '0';
+    // `inset` is unsupported in older WebViews; the longhands are the ones
+    // that actually land there.
+    node.style.top = '0';
+    node.style.left = '0';
+    node.style.right = '0';
+    node.style.bottom = '0';
+    node.style.pointerEvents = 'none';
+  };
+
+  const image = layers.image;
+  if (image) {
+    const node = box(document);
+    fill(node);
+    node.style.backgroundImage = `url("${image.url.replace(/"/g, '%22')}")`;
+    node.style.backgroundSize = image.fit;
+    node.style.backgroundPosition = image.position;
+    node.style.backgroundRepeat = 'no-repeat';
+    node.style.opacity = String(image.opacity);
+    if (image.blur !== undefined) {
+      node.style.filter = `blur(${image.blur}px)`;
+      // A blurred box bleeds its own transparent edge inward, which reads as
+      // a bright rim over the ground. Scaling past the edges hides it.
+      node.style.transform = 'scale(1.1)';
+      // ...but the scaled box now overhangs the screen, and only the canvas
+      // branch clips. Its own clipping wrapper keeps a blurred photo inside
+      // the paywall in the flow branch too.
+      const clip = box(document);
+      fill(clip);
+      clip.style.overflow = 'hidden';
+      node.style.position = 'absolute';
+      clip.appendChild(node);
+      out.push(clip);
+    } else {
+      out.push(node);
+    }
+  }
+
+  const overlay = layers.overlay;
+  if (overlay) {
+    const node = box(document);
+    fill(node);
+    node.style.background = overlay.fill;
+    node.style.opacity = String(overlay.opacity);
+    out.push(node);
+  }
+
+  return out;
+}
+
+/**
  * Renders a whole block document into a screen element.
  *
  * `canvas` documents are authored against a fixed 393×852 device screen and
@@ -954,9 +1184,21 @@ function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document:
 export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTMLDivElement {
   const { doc } = ctx;
   const screen = box(document);
-  screen.style.background = backgroundCss(doc.background);
+  const layers = backgroundLayers(doc.background, (v) => resolveColor(v, doc) ?? v);
+  if (layers.ground !== undefined) screen.style.background = layers.ground;
   screen.style.color = doc.textColor;
   if (doc.fontFamily) screen.style.fontFamily = `"${doc.fontFamily}", inherit`;
+
+  // The photo and scrim are absolutely positioned, so the screen has to be
+  // their containing block. The canvas branch below makes it one anyway; the
+  // flow branch only becomes one when there is art to contain, because
+  // positioning it changes what a pinned block inside anchors to.
+  const art = backgroundArt(layers, document);
+  if (art.length > 0) {
+    screen.style.position = 'relative';
+    screen.style.isolation = 'isolate';
+    for (const layer of art) screen.appendChild(layer);
+  }
 
   const body = box(document);
   for (const block of doc.blocks) {
@@ -979,6 +1221,7 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     body.style.height = `${DESIGN_CANVAS.height}px`;
     body.style.transformOrigin = 'top left';
     body.style.lineHeight = 'normal';
+    body.style.zIndex = '1';
     screen.appendChild(body);
     const fit = () => {
       const width = screen.clientWidth;
@@ -998,6 +1241,10 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
 
   body.style.display = 'flex';
   body.style.flexDirection = 'column';
+  if (art.length > 0) {
+    body.style.position = 'relative';
+    body.style.zIndex = '1';
+  }
   screen.appendChild(body);
   return screen;
 }
