@@ -753,8 +753,32 @@ export interface BlockRenderContext {
   onRestore?: () => void;
   onTerms?: () => void;
   onPrivacy?: () => void;
-  /** Pressing the purchase button. */
-  onPurchase?: () => void;
+  /** Pressing the purchase button, with the package it would buy. The id is
+   *  passed rather than read from the host's own state so the button can
+   *  never charge for a package other than the selected one. */
+  onPurchase?: (packageId: string) => void;
+  /** Reports a plan card tap. Selection is the paywall's own state, so a
+   *  design's plan cards work without the host wiring anything. */
+  onSelect?: (packageId: string) => void;
+}
+
+/**
+ * The package the tree treats as selected: the host's resolved selection when
+ * it is still on offer, else the first package. Shared by the plan cards and
+ * the CTA so a design can never highlight one package and charge for another.
+ */
+function selectedPackageId(ctx: BlockRenderContext): string | undefined {
+  const { packages, highlightPackageId } = ctx;
+  return highlightPackageId && packages.some((p) => p.packageId === highlightPackageId)
+    ? highlightPackageId
+    : packages[0]?.packageId;
+}
+
+/** Makes a card its package's selection target. */
+function makeSelectable(node: HTMLElement, ctx: BlockRenderContext, packageId: string): void {
+  if (!ctx.onSelect) return;
+  node.style.cursor = 'pointer';
+  node.addEventListener('click', () => ctx.onSelect?.(packageId));
 }
 
 function div(doc: Document, tag = 'div'): HTMLElement {
@@ -898,7 +922,17 @@ export function renderBlock(
       node.style.font = node.style.font || '';
       applyBlockStyle(node, block.style, doc);
       node.textContent = resolveTags(String(block.label ?? ''), pkg, packages);
-      if (ctx.onPurchase) node.addEventListener('click', () => ctx.onPurchase?.());
+      if (ctx.onPurchase) {
+        node.addEventListener('click', (event) => {
+          // Consumes its own tap, the way RN's Pressable does. A CTA sitting
+          // inside a plan card would otherwise also bubble to the card's
+          // selection handler — charging the previously selected package and
+          // only then moving the selection onto the one just clicked.
+          event.stopPropagation();
+          const id = selectedPackageId(ctx);
+          if (id !== undefined) ctx.onPurchase?.(id);
+        });
+      }
       return node;
     }
 
@@ -926,7 +960,12 @@ export function renderBlock(
           button.setAttribute('role', 'button');
           button.setAttribute('tabindex', '0');
           button.textContent = entry.label;
-          button.addEventListener('click', () => entry.onPress?.());
+          // Consumes its own tap, so Restore inside a plan card does not also
+          // select that card.
+          button.addEventListener('click', (event) => {
+            event.stopPropagation();
+            entry.onPress?.();
+          });
           node.appendChild(button);
         } else if (entry.url) {
           const anchor = document.createElement('a');
@@ -936,6 +975,9 @@ export function renderBlock(
           anchor.style.cursor = 'pointer';
           anchor.style.color = 'inherit';
           anchor.textContent = entry.label;
+          // Same rule as the handler branch: following a link out of a plan
+          // card must not also change which package the CTA buys.
+          anchor.addEventListener('click', (event) => event.stopPropagation());
           node.appendChild(anchor);
         } else {
           const span = div(document, 'span');
@@ -1006,10 +1048,7 @@ function renderCard(
   const layout = block.layout ?? 'column';
   const children = Array.isArray(block.children) ? block.children : [];
 
-  const selectedId =
-    ctx.highlightPackageId && packages.some((p) => p.packageId === ctx.highlightPackageId)
-      ? ctx.highlightPackageId
-      : packages[0]?.packageId;
+  const selectedId = selectedPackageId(ctx);
 
   const fill = (node: HTMLElement, ctxPkg: BlockPackage | undefined) => {
     for (const child of children) {
@@ -1030,6 +1069,7 @@ function renderCard(
       if (layout !== 'stack') node.style.borderRadius = '16px';
       applyBlockStyle(node, block.style, doc);
       if (p && p.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc);
+      if (p) makeSelectable(node, ctx, p.packageId);
       fill(node, p);
       wrapper.appendChild(node);
     }
@@ -1046,17 +1086,25 @@ function renderCard(
   containerBase(block, node);
   if (layout !== 'stack') node.style.borderRadius = '16px';
   applyBlockStyle(node, block.style, doc);
-  fill(node, block.packageIndex !== undefined ? (packages[block.packageIndex] ?? pkg) : pkg);
+  // A card pinned to a package doubles as its selection target — that is how
+  // hand-styled plan rows (a highlighted annual beside a plain monthly) become
+  // tappable without a products block. It takes `selectedStyle` when selected
+  // for the same reason a repeated card does, or tapping it would change what
+  // the CTA buys with no visible answer. A card that names no package is
+  // decoration and stays inert.
+  const pinned = block.packageIndex !== undefined ? packages[block.packageIndex] : undefined;
+  if (pinned) {
+    if (pinned.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc);
+    makeSelectable(node, ctx, pinned.packageId);
+  }
+  fill(node, pinned ?? pkg);
   return node;
 }
 
 function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document: Document): HTMLElement {
   const { doc, packages } = ctx;
   const shown = packages;
-  const hlId =
-    ctx.highlightPackageId && shown.some((p) => p.packageId === ctx.highlightPackageId)
-      ? ctx.highlightPackageId
-      : shown[0]?.packageId;
+  const hlId = selectedPackageId(ctx);
   const row = block.direction === 'row';
 
   const node = div(document);
@@ -1079,6 +1127,9 @@ function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document:
     card.style.background = hl ? withAlpha(doc.accent, 0.12) : 'transparent';
     card.style.textAlign = row ? 'center' : 'left';
     applyBlockStyle(card, hl ? block.highlightStyle : block.cardStyle, doc);
+    // The whole card is the target, not just its glyphs — a plan row is mostly
+    // padding, and tapping beside the price must select.
+    makeSelectable(card, ctx, pkg.packageId);
 
     if (hl && block.badgeText) {
       const badge = div(document, 'span');

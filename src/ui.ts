@@ -218,7 +218,8 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           onRestore: o.onRestore,
           onTerms: o.onTerms,
           onPrivacy: o.onPrivacy,
-          onPurchase: o.loading || selectedId === undefined ? undefined : () => o.onPurchase(selectedId),
+          onPurchase: o.loading ? undefined : (packageId) => o.onPurchase(packageId),
+          onSelect: (packageId) => this.select(packageId),
         },
         doc,
       );

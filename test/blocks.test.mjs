@@ -266,10 +266,166 @@ describe('links and purchase wiring', () => {
   });
 
   test('the purchase button reports the selected package', () => {
-    let bought = 0;
-    const screen = render([{ id: 'b', type: 'button', label: 'Go' }], { onPurchase: () => (bought += 1) });
+    const bought = [];
+    const screen = render([{ id: 'b', type: 'button', label: 'Go' }], {
+      onPurchase: (id) => bought.push(id),
+    });
     screen.firstChild.firstChild.dispatchEvent(new document.defaultView.MouseEvent('click'));
-    assert.equal(bought, 1);
+    assert.deepEqual(bought, ['annual']);
+  });
+
+  test('the purchase button buys the highlighted package, not the first one', () => {
+    const bought = [];
+    const screen = render([{ id: 'b', type: 'button', label: 'Go' }], {
+      highlightPackageId: 'monthly',
+      onPurchase: (id) => bought.push(id),
+    });
+    screen.firstChild.firstChild.dispatchEvent(new document.defaultView.MouseEvent('click'));
+    assert.deepEqual(bought, ['monthly']);
+  });
+});
+
+describe('plan selection', () => {
+  const click = (node) => node.dispatchEvent(new document.defaultView.MouseEvent('click'));
+
+  test('a products card reports the tapped package', () => {
+    const picked = [];
+    const screen = render([{ id: 'p', type: 'products' }], { onSelect: (id) => picked.push(id) });
+    const cards = screen.firstChild.firstChild.childNodes;
+    assert.equal(cards.length, 2);
+    click(cards[1]);
+    assert.deepEqual(picked, ['monthly']);
+  });
+
+  test('a repeat card reports the tapped instance', () => {
+    const picked = [];
+    const screen = render(
+      [
+        {
+          id: 'c',
+          type: 'card',
+          repeat: 'packages',
+          children: [{ id: 't', type: 'text', text: '{title}' }],
+        },
+      ],
+      { onSelect: (id) => picked.push(id) },
+    );
+    // The repeat wrapper is display:contents, so its instances are the cards.
+    const instances = screen.firstChild.firstChild.childNodes;
+    assert.equal(instances.length, 2);
+    click(instances[1]);
+    assert.deepEqual(picked, ['monthly']);
+  });
+
+  test('a packageIndex-pinned card reports its own package', () => {
+    const picked = [];
+    const screen = render(
+      [
+        {
+          id: 'c',
+          type: 'card',
+          packageIndex: 1,
+          children: [{ id: 't', type: 'text', text: '{title}' }],
+        },
+      ],
+      { onSelect: (id) => picked.push(id) },
+    );
+    click(screen.firstChild.firstChild);
+    assert.deepEqual(picked, ['monthly']);
+  });
+
+  test('a card naming no package is decoration and stays inert', () => {
+    const picked = [];
+    const screen = render(
+      [{ id: 'c', type: 'card', children: [{ id: 't', type: 'text', text: 'Decoration' }] }],
+      { onSelect: (id) => picked.push(id) },
+    );
+    const card = screen.firstChild.firstChild;
+    click(card);
+    assert.deepEqual(picked, []);
+    // No pointer affordance either, so it never looks tappable.
+    assert.notEqual(card.style.cursor, 'pointer');
+  });
+
+  test('the selected products card carries the highlight treatment', () => {
+    const screen = render([{ id: 'p', type: 'products', highlightSub: 'Best value' }], {
+      highlightPackageId: 'monthly',
+    });
+    const cards = screen.firstChild.firstChild.childNodes;
+    // The highlight follows the selection rather than being pinned to first.
+    assert.equal(cards[0].textContent.includes('Best value'), false);
+    assert.equal(cards[1].textContent.includes('Best value'), true);
+  });
+
+  test('a repeat card applies selectedStyle to the selected instance only', () => {
+    const screen = render(
+      [
+        {
+          id: 'c',
+          type: 'card',
+          repeat: 'packages',
+          style: { radius: 4 },
+          selectedStyle: { radius: 20 },
+          children: [{ id: 't', type: 'text', text: '{title}' }],
+        },
+      ],
+      { highlightPackageId: 'monthly' },
+    );
+    const instances = screen.firstChild.firstChild.childNodes;
+    assert.equal(instances[0].style.borderRadius, '4px');
+    assert.equal(instances[1].style.borderRadius, '20px');
+  });
+
+  test('a pinned card takes selectedStyle when it is the selected one', () => {
+    const pinned = (index) => ({
+      id: `c${index}`,
+      type: 'card',
+      packageIndex: index,
+      style: { radius: 4 },
+      selectedStyle: { radius: 20 },
+      children: [{ id: `t${index}`, type: 'text', text: '{title}' }],
+    });
+    const screen = render([pinned(0), pinned(1)], { highlightPackageId: 'monthly' });
+    const cards = screen.firstChild.childNodes;
+    // Tapping a pinned card changes what the CTA buys, so it has to show it.
+    assert.equal(cards[0].style.borderRadius, '4px');
+    assert.equal(cards[1].style.borderRadius, '20px');
+  });
+
+  test('a CTA inside a plan card consumes its own tap', () => {
+    const picked = [];
+    const bought = [];
+    const screen = render(
+      [
+        {
+          id: 'c',
+          type: 'card',
+          packageIndex: 1,
+          children: [{ id: 'b', type: 'button', label: 'Go' }],
+        },
+      ],
+      { onSelect: (id) => picked.push(id), onPurchase: (id) => bought.push(id) },
+    );
+    click(screen.firstChild.firstChild.firstChild);
+    // The click must not also bubble to the card: doing so would charge the
+    // previously selected package and only then move the selection.
+    assert.deepEqual(bought, ['annual']);
+    assert.deepEqual(picked, []);
+  });
+
+  test('no packages leaves the tree inert rather than throwing', () => {
+    const picked = [];
+    const screen = renderBlockDoc(
+      {
+        doc: { ...DOC, blocks: [{ id: 'p', type: 'products' }, { id: 'b', type: 'button', label: 'Go' }] },
+        packages: [],
+        onSelect: (id) => picked.push(id),
+        onPurchase: (id) => picked.push(id),
+      },
+      document,
+    );
+    click(screen.firstChild.childNodes[1]);
+    assert.deepEqual(picked, []);
   });
 });
 
