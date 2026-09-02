@@ -112,6 +112,14 @@ export interface RevnixPaywallOptions {
    *  Passing `client` as well reports `paywall.closed` against this display's
    *  own view id, so the close pairs with its paywall.viewed. */
   onClose?: () => void;
+
+  /** Reports a paint string the designed renderer could not read — a border,
+   *  shadow or filter in a form CSS itself rejects.
+   *
+   *  Local only: nothing is sent anywhere. The WebView paints CSS gradients
+   *  natively, so a `fill` never needs this; it exists so the one class of
+   *  value CSS discards silently is not lost without a word. */
+  onDiagnostic?: (message: string) => void;
   theme?: Partial<RevnixPaywallTheme>;
   /** When given, the paywall reports one paywall.viewed per render-mount
    *  (REV-094) — the analytics funnel's "Paywall displayed" stage. The
@@ -281,6 +289,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           onPurchase: o.loading ? undefined : (packageId) => o.onPurchase(packageId),
           onSelect: (packageId) => this.select(packageId),
           onClose: o.onClose ? () => this.close() : undefined,
+          onDiagnostic: o.onDiagnostic,
         },
         doc,
       );
