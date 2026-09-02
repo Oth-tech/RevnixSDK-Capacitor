@@ -80,6 +80,9 @@ class RevnixPlugin : Plugin() {
         )
         client = created
         // Owns connection, purchase replay, acknowledgement, and the queue drain.
+        // A re-configure retires the previous connector first, or two would
+        // replay and acknowledge the same purchases.
+        billing?.close()
         billing = PlayBillingConnector.start(context, created)
         scope.launch {
             created.registerInstall(platform = "android-capacitor", appVersion = null)

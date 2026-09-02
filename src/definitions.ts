@@ -201,7 +201,15 @@ export interface RevnixDiagnostic {
  */
 export interface RevnixPlugin {
   /** Configure once at startup. Native platforms drain the purchase retry
-   *  queue and report the install as launch chores (both idempotent). */
+   *  queue and report the install as launch chores (both idempotent), and
+   *  start the store observer: iOS watches StoreKit 2 `Transaction.updates`
+   *  (renewals, Ask to Buy approvals, refunds, purchases on another device),
+   *  Android replays Play Billing purchases. Observed transactions are
+   *  registered with proof and then finished/acknowledged by Revnix, so a
+   *  purchase you also register from JS comes back `duplicate: true` — not
+   *  an error. If another IAP plugin must finish iOS transactions itself,
+   *  keep that in mind: Revnix finishes only after the claim is recorded or
+   *  durably queued. Calling configure again retires the previous observer. */
   configure(options: ConfigureOptions): Promise<void>;
 
   /** Anonymous id, minted and persisted natively on first use. */
