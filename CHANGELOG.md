@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- The native SDKs are git submodules (`ios/Revnix` → RevnixSDK-iOS,
+  `android/revnix-kotlin` → RevnixSDK-Android) instead of vendored copies,
+  which had already drifted from upstream. Clone with
+  `--recurse-submodules`. Both bridges now forward the placement's `paywall`
+  and `experiment` as the raw wire values (upstream `paywallJSON` /
+  `paywallJson`), so a designed paywall from a newer dashboard reaches JS
+  untouched.
+- **iOS deployment target is 16.0** (was 15.0), revnix-swift's floor.
 - `renderRevnixPaywall(container, options)` (REV-226) — framework-free DOM
   paywall renderer, ported 1:1 from revnix-react's `RevnixPaywall` (all nine
   template layouts, dark/light modes, anchor-price currency guard, one

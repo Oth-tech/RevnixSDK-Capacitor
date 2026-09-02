@@ -63,7 +63,8 @@ class ExampleUnitTest {
             )
         )
         val resolution = runBlocking { client.resolvePlacement("main") }
-        val experiment = resolution.experiment!!.jsonObject
+        // The bridge forwards the raw wire value, so that is what is checked.
+        val experiment = resolution.experimentJson!!.jsonObject
         assertEquals("summer-pricing", experiment["key"]?.jsonPrimitive?.content)
         assertEquals("var_b", experiment["variantId"]?.jsonPrimitive?.content)
         val url = sent!!.url
@@ -80,7 +81,8 @@ class ExampleUnitTest {
         for (body in listOf(nullBody, absentBody)) {
             val resolution = json.decodeFromString(PlacementResolution.serializer(), body)
             // The bridge surfaces both as JS null.
-            assertTrue(resolution.experiment == null || resolution.experiment is JsonNull)
+            assertTrue(resolution.experimentJson == null || resolution.experimentJson is JsonNull)
+            assertTrue(resolution.experiment == null)
         }
     }
 }

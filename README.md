@@ -6,10 +6,12 @@
 - **Android** bridges [`revnix-kotlin`](https://github.com/Oth-tech/RevnixSDK-Android) (Play Billing 8)
 - **Web** delegates to [`revnix-react`](https://www.npmjs.com/package/revnix-react), the canonical TypeScript implementation of the resilience policy
 
-> Until the native SDKs ship to CocoaPods/SPM and Maven Central, their 0.2.0
-> sources are **vendored** inside this plugin (`ios/…/Revnix/`,
-> `android/…/com/revnix/`) so it builds standalone. Fix native bugs upstream,
-> then re-copy.
+> The native SDKs are not on CocoaPods / Maven Central yet, so this plugin
+> carries them as **git submodules** (`ios/Revnix`, `android/revnix-kotlin`)
+> and compiles their sources straight into the plugin. Clone with
+> `git clone --recurse-submodules` (or `git submodule update --init` in an
+> existing checkout). To pick up a native fix, bump the submodule pin; never
+> edit the native sources from here. iOS 16.0+ (revnix-swift's floor).
 
 What every platform guarantees: network-first entitlements with an offline
 cache flagged `stale`, deliberate rejections (401/403/404/409) never masked by
