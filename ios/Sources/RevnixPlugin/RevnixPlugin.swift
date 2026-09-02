@@ -37,6 +37,26 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private var client: RevnixClient?
+    /// The StoreKit 2 observer (`Transaction.updates`), started by
+    /// `configure`. Transactions that complete outside a JS-initiated
+    /// purchase — renewals, Ask to Buy approvals, refunds, another device —
+    /// never pass through JS, so the observer lives here (the Flutter plugin
+    /// does the same; Android's PlayBillingConnector plays this role). A
+    /// re-configure retires the previous observer, and `deinit` the last
+    /// one. Exposed for tests; read-only outside.
+    private(set) var observer: Task<Void, Never>?
+
+    // Test seams: let the suite keep `configure` off the disk and the
+    // network, and see which client the observer was bound to. Production
+    // never assigns them.
+    var configOverride: ((inout RevnixConfig) -> Void)?
+    var startObserver: (RevnixClient) -> Task<Void, Never> = {
+        RevnixStoreKit.startObserving(client: $0)
+    }
+
+    deinit {
+        observer?.cancel()
+    }
 
     // MARK: - Lifecycle
 
@@ -49,7 +69,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject("apiKey and baseUrl are required", "invalid", nil, ["isRetryable": false])
             return
         }
-        let config = RevnixConfig(
+        var config = RevnixConfig(
             apiKey: apiKey,
             baseURL: url,
             timeout: (call.getDouble("timeoutMs") ?? 10_000) / 1000.0,
@@ -62,8 +82,11 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                     data: ["op": diagnostic.op, "message": diagnostic.message])
             }
         )
+        configOverride?(&config)
         let created = RevnixClient(config)
         client = created
+        observer?.cancel()
+        observer = startObserver(created)
         // Launch chores, same family contract as every Revnix SDK: drain the
         // retry queue, report the install. Idempotent; never blocks configure.
         Task {

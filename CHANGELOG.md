@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **iOS starts the StoreKit 2 observer in `configure`.** Renewals, Ask to
+  Buy approvals, refunds, and purchases made on another device now reach
+  Revnix on Capacitor iOS, as they already did on Flutter and Android. The
+  observer registers each transaction with its JWS and finishes it once the
+  claim is recorded or durably queued; a purchase you also register from JS
+  simply returns `duplicate: true`. A second `configure` retires the
+  previous observer (Android now retires its Play Billing connector the same
+  way).
 - The native SDKs are git submodules (`ios/Revnix` → RevnixSDK-iOS,
   `android/revnix-kotlin` → RevnixSDK-Android) instead of vendored copies,
   which had already drifted from upstream. Clone with

@@ -27,7 +27,10 @@ let package = Package(
             path: "ios/Sources/RevnixPlugin"),
         .testTarget(
             name: "RevnixPluginTests",
-            dependencies: ["RevnixPlugin"],
+            dependencies: [
+                "RevnixPlugin",
+                .product(name: "Capacitor", package: "capacitor-swift-pm"),
+            ],
             path: "ios/Tests/RevnixPluginTests")
     ]
 )

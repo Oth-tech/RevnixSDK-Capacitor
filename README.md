@@ -17,7 +17,10 @@ What every platform guarantees: network-first entitlements with an offline
 cache flagged `stale`, deliberate rejections (401/403/404/409) never masked by
 that cache, one fetch per screen of gates (soft TTL + coalescing), a durable
 purchase retry queue drained idempotently on every launch, and read-your-writes
-unlock via `waitForEntitlements(seq)`.
+unlock via `waitForEntitlements(seq)`. On native, `configure` also starts the
+store observer (StoreKit 2 `Transaction.updates` on iOS, Play Billing on
+Android), so renewals, Ask to Buy approvals, refunds, and other-device purchases
+reach Revnix without passing through JS.
 
 ## Quick start
 
@@ -37,7 +40,9 @@ const { entitled } = await Revnix.isEntitled({ entitlementId: 'pro' });
 const placement = await Revnix.resolvePlacement({ placementKey: 'main_paywall' });
 await Revnix.logPaywallShown({ placementKey: 'main_paywall' });
 
-// After a store purchase completes (StoreKit 2 / Play Billing):
+// After a store purchase completes (StoreKit 2 / Play Billing). The native
+// observer sees it too; one of the two returns `duplicate: true`, and this
+// call is what hands you `seq` for the unlock below.
 const result = await Revnix.registerPurchase({
   source: 'apple',
   token: originalTransactionId,
@@ -143,7 +148,15 @@ configure(options: ConfigureOptions) => Promise<void>
 ```
 
 Configure once at startup. Native platforms drain the purchase retry
-queue and report the install as launch chores (both idempotent).
+queue and report the install as launch chores (both idempotent), and
+start the store observer: iOS watches StoreKit 2 `Transaction.updates`
+(renewals, Ask to Buy approvals, refunds, purchases on another device),
+Android replays Play Billing purchases. Observed transactions are
+registered with proof and then finished/acknowledged by Revnix, so a
+purchase you also register from JS comes back `duplicate: true` — not
+an error. If another IAP plugin must finish iOS transactions itself,
+keep that in mind: Revnix finishes only after the claim is recorded or
+durably queued. Calling configure again retires the previous observer.
 
 | Param         | Type                                                          |
 | ------------- | ------------------------------------------------------------- |
@@ -639,6 +652,8 @@ Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 </docgen-api>
