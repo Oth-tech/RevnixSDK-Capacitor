@@ -432,6 +432,30 @@ export function resolveColor(value: string | undefined, doc: PaywallBlockDoc): s
   });
 }
 
+/** True when the string is a CSS gradient rather than a plain color. */
+export function isGradient(value: string): boolean {
+  return /gradient\s*\(/i.test(value);
+}
+
+/**
+ * A field that can only ever be ONE color — a border, a shadow, a filter.
+ *
+ * CSS has no gradient `border-color`, so handing a gradient to the `border`
+ * shorthand makes the browser discard the whole declaration and the stroke
+ * vanishes with no error. Collapsing it to the color it stands for keeps the
+ * stroke visible, which is nearer the design's intent than losing it.
+ */
+export function flatColor(
+  value: string | undefined,
+  doc: PaywallBlockDoc,
+  onDiagnostic?: (message: string) => void,
+): string | undefined {
+  const resolved = resolveColor(value, doc);
+  if (resolved === undefined || !isGradient(resolved)) return resolved;
+  onDiagnostic?.(`gradient flattened in a colour-only field: ${resolved}`);
+  return backgroundBaseColor(resolved);
+}
+
 /** The screen background's ground layer as a CSS `background` value. The
  *  photo and scrim are separate boxes — see `backgroundLayers`. */
 export function backgroundCss(background: unknown): string {
@@ -667,22 +691,30 @@ const px = (v: number | string): string => (typeof v === 'number' ? `${v}px` : v
  * key this SDK does not know is simply never read, which is what lets a newer
  * dashboard's design render here minus that one effect instead of failing.
  */
-export function applyBlockStyle(node: HTMLElement, s: BlockStyle | undefined, doc: PaywallBlockDoc): void {
+export function applyBlockStyle(
+  node: HTMLElement,
+  s: BlockStyle | undefined,
+  doc: PaywallBlockDoc,
+  onDiagnostic?: (message: string) => void,
+): void {
   if (!s) return;
   const css = node.style;
   const color = (v: string | undefined) => resolveColor(v, doc);
+  // `background` takes a gradient; a border, shadow or filter does not, and
+  // an invalid value there is dropped silently by the CSSOM.
+  const flat = (v: string | undefined) => flatColor(v, doc, onDiagnostic);
 
   if (s.fill !== undefined) css.background = color(s.fill) ?? '';
   if (s.fillSize !== undefined) css.backgroundSize = s.fillSize;
   if (s.textColor !== undefined) css.color = color(s.textColor) ?? '';
   if (s.opacity !== undefined) css.opacity = String(s.opacity / 100);
   if (s.borderColor !== undefined || s.borderWidth !== undefined) {
-    css.border = `${s.borderWidth ?? 1}px solid ${color(s.borderColor) ?? doc.textColor}`;
+    css.border = `${s.borderWidth ?? 1}px solid ${flat(s.borderColor) ?? doc.textColor}`;
   }
-  if (s.borderTop !== undefined) css.borderTop = color(s.borderTop) ?? '';
-  if (s.borderRight !== undefined) css.borderRight = color(s.borderRight) ?? '';
-  if (s.borderBottom !== undefined) css.borderBottom = color(s.borderBottom) ?? '';
-  if (s.borderLeft !== undefined) css.borderLeft = color(s.borderLeft) ?? '';
+  if (s.borderTop !== undefined) css.borderTop = flat(s.borderTop) ?? '';
+  if (s.borderRight !== undefined) css.borderRight = flat(s.borderRight) ?? '';
+  if (s.borderBottom !== undefined) css.borderBottom = flat(s.borderBottom) ?? '';
+  if (s.borderLeft !== undefined) css.borderLeft = flat(s.borderLeft) ?? '';
   if (s.radius !== undefined) css.borderRadius = px(s.radius);
   if (s.padding !== undefined) css.padding = px(s.padding);
   if (s.paddingX !== undefined) {
@@ -730,9 +762,9 @@ export function applyBlockStyle(node: HTMLElement, s: BlockStyle | undefined, do
   if (s.justify !== undefined) css.justifyContent = JUSTIFY[s.justify] ?? '';
   if (s.items !== undefined) css.alignItems = ITEMS[s.items] ?? '';
   if (s.selfAlign !== undefined) css.alignSelf = ITEMS[s.selfAlign] ?? '';
-  if (s.shadow !== undefined) css.boxShadow = color(s.shadow) ?? '';
+  if (s.shadow !== undefined) css.boxShadow = flat(s.shadow) ?? '';
   if (s.blur !== undefined) css.backdropFilter = `blur(${s.blur}px)`;
-  if (s.filter !== undefined) css.filter = color(s.filter) ?? '';
+  if (s.filter !== undefined) css.filter = flat(s.filter) ?? '';
   if (s.clipPath !== undefined) css.clipPath = s.clipPath;
   if (s.rotate !== undefined) css.transform = `rotate(${s.rotate}deg)`;
   if (s.translate !== undefined) css.translate = s.translate;
@@ -778,6 +810,10 @@ export interface BlockRenderContext {
   /** Dismissal (REV-252). Omitted means no close is drawn at all — a dead
    *  close button is worse than none. */
   onClose?: () => void;
+  /** Where the renderer reports a paint string it could not read. Local only —
+   *  it never leaves the device. The WebView paints CSS gradients natively, so
+   *  this fires only for the colour-only fields CSS itself rejects. */
+  onDiagnostic?: (message: string) => void;
 }
 
 /**
@@ -875,7 +911,7 @@ export function renderBlock(
       // chip, centered badges) is a flex box in the source design; without
       // display:flex those properties are inert and the glyph sits top-left.
       if (s?.items !== undefined || s?.justify !== undefined) node.style.display = 'flex';
-      applyBlockStyle(node, s, doc);
+      applyBlockStyle(node, s, doc, ctx.onDiagnostic);
       node.textContent = resolveTags(String(block.text ?? ''), pkg, packages);
       makeClosable(node, ctx, block.action);
       return node;
@@ -898,7 +934,7 @@ export function renderBlock(
       node.style.borderRadius = block.shape === 'circle' ? '50%' : sized ? '0' : '16px';
       node.style.overflow = 'hidden';
       node.style.flexShrink = '0';
-      applyBlockStyle(node, s, doc);
+      applyBlockStyle(node, s, doc, ctx.onDiagnostic);
       if (url) {
         const img = document.createElement('img');
         img.src = url;
@@ -927,7 +963,7 @@ export function renderBlock(
       node.style.flexDirection = 'column';
       node.style.gap = px(block.style?.gap ?? 8);
       node.style.textAlign = 'left';
-      applyBlockStyle(node, block.style, doc);
+      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
       const items = Array.isArray(block.items) ? block.items : [];
       for (const item of items) {
         const row = div(document);
@@ -985,7 +1021,7 @@ export function renderBlock(
       node.style.textAlign = 'center';
       node.style.cursor = 'pointer';
       node.style.font = node.style.font || '';
-      applyBlockStyle(node, block.style, doc);
+      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
       node.textContent = resolveTags(String(block.label ?? ''), pkg, packages);
       if (closes) {
         makeClosable(node, ctx, block.action);
@@ -1017,7 +1053,7 @@ export function renderBlock(
       node.style.gap = '20px';
       node.style.fontSize = '12px';
       node.style.opacity = '0.65';
-      applyBlockStyle(node, block.style, doc);
+      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
       for (const entry of entries) {
         // An explicit host handler wins over the config URL — the app knows
         // best how to open its own legal pages; the URL is the fallback.
@@ -1060,7 +1096,7 @@ export function renderBlock(
       node.style.height = '1px';
       node.style.background = 'currentColor';
       node.style.opacity = '0.16';
-      applyBlockStyle(node, block.style, doc);
+      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
       return node;
     }
 
@@ -1070,7 +1106,7 @@ export function renderBlock(
         node.style.flex = '1';
       } else {
         node.style.height = '16px';
-        applyBlockStyle(node, block.style, doc);
+        applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
       }
       return node;
     }
@@ -1134,8 +1170,8 @@ function renderCard(
       const node = div(document);
       containerBase(block, node);
       if (layout !== 'stack') node.style.borderRadius = '16px';
-      applyBlockStyle(node, block.style, doc);
-      if (p && p.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc);
+      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
+      if (p && p.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc, ctx.onDiagnostic);
       if (p) makeSelectable(node, ctx, p.packageId);
       fill(node, p);
       wrapper.appendChild(node);
@@ -1152,7 +1188,7 @@ function renderCard(
   const node = div(document);
   containerBase(block, node);
   if (layout !== 'stack') node.style.borderRadius = '16px';
-  applyBlockStyle(node, block.style, doc);
+  applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
   // A card pinned to a package doubles as its selection target — that is how
   // hand-styled plan rows (a highlighted annual beside a plain monthly) become
   // tappable without a products block. It takes `selectedStyle` when selected
@@ -1161,7 +1197,7 @@ function renderCard(
   // decoration and stays inert.
   const pinned = block.packageIndex !== undefined ? packages[block.packageIndex] : undefined;
   if (pinned) {
-    if (pinned.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc);
+    if (pinned.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc, ctx.onDiagnostic);
     makeSelectable(node, ctx, pinned.packageId);
   }
   fill(node, pinned ?? pkg);
@@ -1178,7 +1214,7 @@ function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document:
   node.style.display = 'flex';
   node.style.flexDirection = row ? 'row' : 'column';
   node.style.gap = px(block.style?.gap ?? 8);
-  applyBlockStyle(node, block.style, doc);
+  applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
 
   for (const pkg of shown) {
     const hl = pkg.packageId === hlId;
@@ -1193,7 +1229,7 @@ function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document:
     card.style.border = `1.5px solid ${hl ? doc.accent : 'rgba(128,128,128,0.35)'}`;
     card.style.background = hl ? withAlpha(doc.accent, 0.12) : 'transparent';
     card.style.textAlign = row ? 'center' : 'left';
-    applyBlockStyle(card, hl ? block.highlightStyle : block.cardStyle, doc);
+    applyBlockStyle(card, hl ? block.highlightStyle : block.cardStyle, doc, ctx.onDiagnostic);
     // The whole card is the target, not just its glyphs — a plan row is mostly
     // padding, and tapping beside the price must select.
     makeSelectable(card, ctx, pkg.packageId);
