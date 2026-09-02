@@ -352,10 +352,13 @@ class RevnixPlugin : Plugin() {
                 )
             },
         )
-        resolution.paywall?.let { put("paywall", js(it)) }
+        // The raw copies, not the typed `paywall` / `experiment`: JS owns the
+        // parse, and the typed paywall is decoded through the native block
+        // model, which drops what it does not know.
+        resolution.paywallJson?.let { put("paywall", js(it)) }
         // REV-219: always present, per the TS contract — a null/absent wire
         // value both surface as JS null.
-        when (val experiment = resolution.experiment) {
+        when (val experiment = resolution.experimentJson) {
             null, JsonNull -> put("experiment", JSONObject.NULL)
             else -> put("experiment", js(experiment))
         }

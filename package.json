@@ -8,10 +8,15 @@
   "unpkg": "dist/plugin.js",
   "files": [
     "android/src/main/",
+    "android/revnix-kotlin/revnix-core/src/main/",
+    "android/revnix-kotlin/revnix-android/src/main/",
     "android/build.gradle",
     "dist/",
     "ios/Sources",
     "ios/Tests",
+    "ios/Revnix/Package.swift",
+    "ios/Revnix/Sources",
+    "ios/Revnix/Tests",
     "Package.swift",
     "RevnixCapacitor.podspec"
   ],

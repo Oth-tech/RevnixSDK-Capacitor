@@ -1,9 +1,12 @@
 import Capacitor
 import Foundation
 
-// revnix-swift is vendored into this target (Sources/RevnixPlugin/Revnix —
-// same module, so no `import Revnix`). Once it ships to SPM/CocoaPods, delete
-// the vendored folder, add the package dependency, and restore the import.
+// revnix-swift comes from the git submodule at ios/Revnix. Under Swift Package
+// Manager it is its own module (imported here); under CocoaPods the podspec
+// compiles the same sources into this module, so there is nothing to import.
+#if canImport(Revnix)
+    import Revnix
+#endif
 
 /// iOS side of the Capacitor bridge — a thin adapter over `revnix-swift`.
 ///
@@ -323,10 +326,13 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             "revision": resolution.revision,
             "offering": offering,
         ]
-        if let paywall = resolution.paywall { out["paywall"] = any(paywall) }
+        // The raw copies, not the typed `paywall` / `experiment`: JS owns the
+        // parse, and the typed paywall is decoded through the native block
+        // model, which drops what it does not know.
+        if let paywall = resolution.paywallJSON { out["paywall"] = any(paywall) }
         // REV-219: always present, per the TS contract — a null/absent wire
         // value both surface as JS null.
-        out["experiment"] = resolution.experiment.map(any) ?? NSNull()
+        out["experiment"] = resolution.experimentJSON.map(any) ?? NSNull()
         return out
     }
 
