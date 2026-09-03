@@ -7,6 +7,7 @@ import type {
   PlacementResolution,
   RegisterPurchaseInput,
   RegisterPurchaseResult,
+  RevnixPaywallEvent,
   RevnixPlugin,
 } from './definitions';
 
@@ -162,6 +163,37 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
       placementKey: options.placementKey,
       paywallId: options.paywallId,
     });
+  }
+
+  async logPaywallEvent(options: {
+    event: RevnixPaywallEvent;
+    viewId: string;
+    placementKey?: string;
+    paywallId?: string;
+    productId?: string;
+    code?: string;
+    message?: string;
+    eventId?: string;
+  }): Promise<void> {
+    // Feature-detected for the same version-skew reason as logPaywallClosed
+    // above: this package's pinned revnix-react may predate the vocabulary. A
+    // missing method costs the REPORT, never the paywall.
+    const { event, viewId, ...rest } = options;
+    const client = this.require() as unknown as {
+      logPaywallEvent?: (
+        event: RevnixPaywallEvent,
+        viewId: string,
+        options?: {
+          placementKey?: string;
+          paywallId?: string;
+          productId?: string;
+          code?: string;
+          message?: string;
+          eventId?: string;
+        },
+      ) => void;
+    };
+    client.logPaywallEvent?.(event, viewId, rest);
   }
 
   // REV-033 v2: revnix-react 0.12.0 has no setAttributes, so this posts the

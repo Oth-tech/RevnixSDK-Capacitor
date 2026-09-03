@@ -199,6 +199,18 @@ export interface RevnixDiagnostic {
  * · invalid) and `data.isRetryable`. Deliberate rejections (401/403/404/409)
  * are never masked by a cache: a kill-switch must stay a kill-switch.
  */
+/** REV-263: the six paywall interactions `logPaywallEvent` can report — what
+ *  the customer did on a display, between the view that opened it and the
+ *  close or purchase that ended it. The server turns each into the ledger type
+ *  `paywall.<name>`. */
+export type RevnixPaywallEvent =
+  | 'selected'
+  | 'purchase_started'
+  | 'purchase_abandoned'
+  | 'purchase_failed'
+  | 'restore'
+  | 'error';
+
 export interface RevnixPlugin {
   /** Configure once at startup. Native platforms drain the purchase retry
    *  queue and report the install as launch chores (both idempotent), and
@@ -275,6 +287,36 @@ export interface RevnixPlugin {
     viewId: string;
     placementKey?: string;
     paywallId?: string;
+  }): Promise<void>;
+
+  /** Report one of the six paywall interactions (REV-263) — what the customer
+   *  DID on a display, between the `logPaywallShown` that opened it and the
+   *  `logPaywallClosed` (or purchase) that ended it.
+   *
+   *  Fire-and-forget like the other beacons.
+   *
+   *  `viewId` is the id `logPaywallShown` resolved with for THIS display.
+   *  Passing it is what threads the whole life of one impression together and
+   *  puts the event on the paywall's own analytics row.
+   *
+   *  `renderRevnixPaywall` reports `selected`, `purchase_started`, `restore`
+   *  and a no-products `error` for you. The purchase OUTCOME is yours: only
+   *  your app performs the store call, so report `purchase_abandoned` /
+   *  `purchase_failed` from your own purchase error handling.
+   *
+   *  `eventId` is the idempotency key and defaults to `viewId`, which caps the
+   *  report at one per display per event. Pass one per occurrence — and reuse
+   *  it across your own retries — to record each occurrence. */
+  logPaywallEvent(options: {
+    event: RevnixPaywallEvent;
+    viewId: string;
+    placementKey?: string;
+    paywallId?: string;
+    productId?: string;
+    /** Store error code — `purchase_failed` / `error`. */
+    code?: string;
+    message?: string;
+    eventId?: string;
   }): Promise<void>;
 
   /** Set attributes on the current customer. Attributes are what A/B-test

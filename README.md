@@ -125,6 +125,7 @@ handle.destroy(); // remove from the DOM when dismissed
 * [`registerInstall(...)`](#registerinstall)
 * [`logPaywallShown(...)`](#logpaywallshown)
 * [`logPaywallClosed(...)`](#logpaywallclosed)
+* [`logPaywallEvent(...)`](#logpaywallevent)
 * [`setAttributes(...)`](#setattributes)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`removeAllListeners()`](#removealllisteners)
@@ -373,6 +374,38 @@ Pass the id `logPaywallShown` resolved with for this display.
 | Param         | Type                                                                        |
 | ------------- | --------------------------------------------------------------------------- |
 | **`options`** | <code>{ viewId: string; placementKey?: string; paywallId?: string; }</code> |
+
+--------------------
+
+
+### logPaywallEvent(...)
+
+```typescript
+logPaywallEvent(options: { event: RevnixPaywallEvent; viewId: string; placementKey?: string; paywallId?: string; productId?: string; code?: string; message?: string; eventId?: string; }) => Promise<void>
+```
+
+Report one of the six paywall interactions (REV-263) — what the customer
+DID on a display, between the `logPaywallShown` that opened it and the
+`logPaywallClosed` (or purchase) that ended it.
+
+Fire-and-forget like the other beacons.
+
+`viewId` is the id `logPaywallShown` resolved with for THIS display.
+Passing it is what threads the whole life of one impression together and
+puts the event on the paywall's own analytics row.
+
+`renderRevnixPaywall` reports `selected`, `purchase_started`, `restore`
+and a no-products `error` for you. The purchase OUTCOME is yours: only
+your app performs the store call, so report `purchase_abandoned` /
+`purchase_failed` from your own purchase error handling.
+
+`eventId` is the idempotency key and defaults to `viewId`, which caps the
+report at one per display per event. Pass one per occurrence — and reuse
+it across your own retries — to record each occurrence.
+
+| Param         | Type                                                                                                                                                                                                            |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ event: <a href="#revnixpaywallevent">RevnixPaywallEvent</a>; viewId: string; placementKey?: string; paywallId?: string; productId?: string; code?: string; message?: string; eventId?: string; }</code> |
 
 --------------------
 
@@ -646,6 +679,16 @@ A background failure the SDK swallowed (queue drains, telemetry beacons).
 Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 <code>'apple' | 'google'</code>
+
+
+#### RevnixPaywallEvent
+
+REV-263: the six paywall interactions `logPaywallEvent` can report — what
+the customer did on a display, between the view that opened it and the
+close or purchase that ended it. The server turns each into the ledger type
+`paywall.&lt;name&gt;`.
+
+<code>'selected' | 'purchase_started' | 'purchase_abandoned' | 'purchase_failed' | 'restore' | 'error'</code>
 
 
 #### Record
