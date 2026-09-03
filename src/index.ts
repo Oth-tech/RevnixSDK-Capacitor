@@ -18,10 +18,14 @@ export * from './ui';
 // block document themselves, and for `minorUnitsForCurrency`, which a host
 // needs to convert a store price into the minor units the tags read.
 export type {
+  BlockBase,
   BlockPackage,
   BlockRenderContext,
+  BlockScope,
   BlockStyle,
+  BlockVisibility,
   ButtonBlock,
+  CanvasMetrics,
   CardBlock,
   ImageBlock,
   LineBlock,
@@ -33,5 +37,14 @@ export type {
   SpacerBlock,
   TextBlock,
 } from './blocks';
-export { asBlockDoc, minorUnitsForCurrency, renderBlockDoc, resolveTags } from './blocks';
+export {
+  asBlockDoc,
+  canvasMetrics,
+  effectiveStyle,
+  isVisible,
+  minorUnitsForCurrency,
+  renderBlockDoc,
+  resolveSelectedContext,
+  resolveTags,
+} from './blocks';
 export { Revnix };

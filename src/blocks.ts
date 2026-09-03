@@ -17,7 +17,9 @@
 //     the app's SDK must degrade, never crash and never blank.
 //   * A tag with no data behind it stays visible (`{price}` renders as
 //     `{price}`) rather than resolving to something wrong. A customer must
-//     never be shown a price the store will not charge.
+//     never be shown a price the store will not charge. Outside a package
+//     card a tag reads the SELECTED package (render contract v2 §2), so the
+//     renewal line every template carries shows the price the CTA buys.
 
 /** Per-block visual style. Everything optional — a block renders sensibly
  *  with no style at all. Sizes are px numbers; colors are any CSS color, or a
@@ -99,17 +101,36 @@ export interface BlockStyle {
  *  losing the chip, which is what a new block type would have cost. */
 export type BlockAction = 'close';
 
-export interface TextBlock {
+/** When a block is drawn, relative to the selected package (render contract
+ *  v2, REV-262). `selected` draws it only inside a package card whose package
+ *  is the selected one; `unselected` only inside one whose package is not.
+ *  Outside any package card the field is ignored and the block is always
+ *  drawn — a root-level block can never disappear. */
+export type BlockVisibility = 'selected' | 'unselected';
+
+/** The fields every block type carries (render contract v2, REV-262).
+ *
+ *  `selectedStyle` and `visibility` are valid on EVERY block, not only the
+ *  package cards: a radio dot, a "Selected" caption or a checkmark deep inside
+ *  a plan card answers to the card's selection through them. See
+ *  `resolveSelectedContext` for what "selected" means at each depth. */
+export interface BlockBase {
   id: string;
+  style?: BlockStyle;
+  /** Merged over `style`, field by field, while the block is in selected
+   *  context. */
+  selectedStyle?: BlockStyle;
+  visibility?: BlockVisibility;
+}
+
+export interface TextBlock extends BlockBase {
   type: 'text';
   text: string;
   /** Tapping this block dismisses the paywall. See BlockAction. */
   action?: BlockAction;
-  style?: BlockStyle;
 }
 
-export interface ImageBlock {
-  id: string;
+export interface ImageBlock extends BlockBase {
   type: 'image';
   url?: string;
   shape?: 'rect' | 'circle';
@@ -117,19 +138,15 @@ export interface ImageBlock {
   placeholder?: string;
   /** Tapping this block dismisses the paywall. See BlockAction. */
   action?: BlockAction;
-  style?: BlockStyle;
 }
 
-export interface ListBlock {
-  id: string;
+export interface ListBlock extends BlockBase {
   type: 'list';
   items: Array<{ icon?: string; title: string; description?: string }>;
   iconColor?: string;
-  style?: BlockStyle;
 }
 
-export interface ProductsBlock {
-  id: string;
+export interface ProductsBlock extends BlockBase {
   type: 'products';
   direction?: 'column' | 'row';
   titleTpl?: string;
@@ -138,57 +155,45 @@ export interface ProductsBlock {
   badgeText?: string;
   cardStyle?: BlockStyle;
   highlightStyle?: BlockStyle;
-  style?: BlockStyle;
 }
 
-export interface ButtonBlock {
-  id: string;
+export interface ButtonBlock extends BlockBase {
   type: 'button';
   label: string;
   /** `close` turns this button into a dismiss ("Not now") instead of the
    *  purchase CTA, which is what a button means by default. */
   action?: BlockAction;
-  style?: BlockStyle;
 }
 
-export interface LinksBlock {
-  id: string;
+export interface LinksBlock extends BlockBase {
   type: 'links';
   showRestore?: boolean;
   showTerms?: boolean;
   showPrivacy?: boolean;
   termsUrl?: string;
   privacyUrl?: string;
-  style?: BlockStyle;
 }
 
-export interface LineBlock {
-  id: string;
+export interface LineBlock extends BlockBase {
   type: 'line';
-  style?: BlockStyle;
 }
 
-export interface SpacerBlock {
-  id: string;
+export interface SpacerBlock extends BlockBase {
   type: 'spacer';
   flex?: boolean;
-  style?: BlockStyle;
 }
 
 /** The one container block. `layout` picks how children are placed: column /
  *  row are flex lines, `stack` layers them (children position with
  *  style.inset or the edge offsets), and `grid` is an N-column grid. */
-export interface CardBlock {
-  id: string;
+export interface CardBlock extends BlockBase {
   type: 'card';
   layout?: 'column' | 'row' | 'stack' | 'grid';
   repeat?: 'packages';
-  selectedStyle?: BlockStyle;
   packageIndex?: number;
   columns?: number;
   gridColumns?: string;
   children: PaywallBlock[];
-  style?: BlockStyle;
 }
 
 export type PaywallBlock =
@@ -217,6 +222,49 @@ export interface PaywallBlockDoc {
 
 /** The device screen `canvas` designs are authored against. */
 export const DESIGN_CANVAS = { width: 393, height: 852 };
+
+/** The widest a canvas design scales to (render contract v2). A phone-authored
+ *  design never grows past ~1.22×; on a tablet or in landscape it is centred
+ *  in the viewport and the screen background fills the space around it. */
+export const CANVAS_MAX_WIDTH = 480;
+
+/** How a canvas design maps onto one viewport, in CSS px. */
+export interface CanvasMetrics {
+  /** Uniform scale: min(viewportWidth, CANVAS_MAX_WIDTH) / 393. */
+  scale: number;
+  /** Left offset of the scaled design, so it sits centred when the viewport
+   *  is wider than the design can grow. */
+  left: number;
+  /** The body's layout height in DESIGN units: 852, or more when the viewport
+   *  is taller than the scaled design — root cards with `height: "100%"` and
+   *  bottom-anchored groups follow it, exactly as the web preview does in a
+   *  taller frame. */
+  designHeight: number;
+  /** The screen's height in CSS px: `designHeight * scale`. Never shorter than
+   *  the viewport, so the background fills it and no band is left below. */
+  height: number;
+  /** True when the scaled design is taller than the viewport and has to
+   *  scroll. When it fits, scrolling is off entirely. */
+  overflows: boolean;
+}
+
+/**
+ * Pure canvas layout arithmetic (render contract v2 §3). Kept separate from
+ * the DOM so the rule — width-scaled, capped, centred, height-filling — is
+ * testable without a layout engine. A viewport height of 0 (not laid out
+ * yet) leaves the design at its authored 852.
+ */
+export function canvasMetrics(viewportWidth: number, viewportHeight: number): CanvasMetrics {
+  const scale = Math.min(Math.max(viewportWidth, 0), CANVAS_MAX_WIDTH) / DESIGN_CANVAS.width;
+  const designHeight =
+    viewportHeight > 0 && scale > 0
+      ? Math.max(DESIGN_CANVAS.height, viewportHeight / scale)
+      : DESIGN_CANVAS.height;
+  const height = designHeight * scale;
+  const left = Math.max(0, (viewportWidth - DESIGN_CANVAS.width * scale) / 2);
+  const overflows = viewportHeight > 0 && height > viewportHeight + 1;
+  return { scale, left, designHeight, height, overflows };
+}
 
 /** One purchasable row, as the block renderer needs it. The money fields are
  *  optional: without them the price tags stay visible rather than resolving
@@ -790,9 +838,21 @@ export function applyBlockStyle(
 export interface BlockRenderContext {
   doc: PaywallBlockDoc;
   packages: BlockPackage[];
-  /** The package a plan card is visually emphasizing, and the one whose tags
-   *  a subtree resolves against outside a `repeat`. */
+  /** The host's resolved selection — `selectedPackageId`, else the last tap,
+   *  else `config.highlightPackageId`. When it names an offered package it is
+   *  THE selected package: what the plan cards emphasise, what the CTA buys,
+   *  and what every tag outside a package card resolves against. Otherwise
+   *  the first package is. */
   highlightPackageId?: string;
+  /** True while a purchase is in flight (render contract v2 §4): purchase
+   *  buttons disable, hide their label and spin in `accentInk`. Close-action
+   *  buttons are unaffected. */
+  loading?: boolean;
+  /** The scrolling box the screen fills. A `canvas` design extends to its
+   *  height instead of leaving a band, and switches its scrolling off while
+   *  the design fits (render contract v2 §3). Omitted, the window's inner
+   *  height stands in and nothing else is touched. */
+  viewport?: HTMLElement;
   /** Fills an image block that publishes no URL of its own. */
   heroImageUrl?: string;
   /** Paywall-level Terms/Privacy, used when a links block sets none. */
@@ -828,11 +888,112 @@ function selectedPackageId(ctx: BlockRenderContext): string | undefined {
     : packages[0]?.packageId;
 }
 
-/** Makes a card its package's selection target. */
+/** The selected package itself — see `selectedPackageId`. */
+export function selectedPackage(ctx: BlockRenderContext): BlockPackage | undefined {
+  const id = selectedPackageId(ctx);
+  return id === undefined ? undefined : ctx.packages.find((p) => p.packageId === id);
+}
+
+// ——— selected context (render contract v2 §1) ———
+
+/**
+ * Where in the tree a block is being drawn.
+ *
+ * A package card — a card pinned with `packageIndex`, or one instance of a
+ * `repeat: "packages"` card — opens a scope for its package, and every
+ * descendant inherits it until a nearer package card overrides it. At the
+ * root there is no package card, so `selected` is false, `visibility` is not
+ * honoured (a root block is always drawn) and tags resolve against the
+ * selected package.
+ */
+export interface BlockScope {
+  /** The package tags resolve against. */
+  pkg?: BlockPackage;
+  /** True inside a package card whose package is the selected one. */
+  selected: boolean;
+  /** True once inside any package card. `selectedStyle` and `visibility`
+   *  only take effect here. */
+  inPackageCard: boolean;
+}
+
+/** The scope the root blocks are drawn in: the selected package, unselected
+ *  context — so a renewal line outside any card reads the price the CTA
+ *  buys, and a `visibility` on a root block never hides it. */
+export function rootScope(ctx: BlockRenderContext): BlockScope {
+  return { pkg: selectedPackage(ctx), selected: false, inPackageCard: false };
+}
+
+/** The scope a package card opens for `pkg`. */
+export function packageScope(ctx: BlockRenderContext, pkg: BlockPackage | undefined): BlockScope {
+  return {
+    pkg,
+    selected: pkg !== undefined && pkg.packageId === selectedPackageId(ctx),
+    inPackageCard: true,
+  };
+}
+
+/**
+ * The scope `block` is drawn in, given the scope of its parent.
+ *
+ * Only a package card changes scope; every other block — including a plain
+ * card — inherits its parent's. A `repeat` card is resolved per instance by
+ * `renderCard` (it has one scope per package), so here it inherits.
+ */
+export function resolveSelectedContext(block: PaywallBlock, ctx: BlockRenderContext, parent: BlockScope): BlockScope {
+  if (block.type !== 'card' || block.repeat !== undefined || block.packageIndex === undefined) return parent;
+  const pinned = ctx.packages[block.packageIndex];
+  return pinned === undefined ? parent : packageScope(ctx, pinned);
+}
+
+/** `style`, with `selectedStyle` merged over it field by field while the
+ *  block is in selected context. */
+export function effectiveStyle(block: BlockBase, scope: BlockScope): BlockStyle | undefined {
+  if (!scope.selected || !block.selectedStyle) return block.style;
+  return { ...(block.style ?? {}), ...block.selectedStyle };
+}
+
+/** Whether `block` is drawn at all in `scope`. `visibility` is ignored outside
+ *  a package card: a root block is never hidden. */
+export function isVisible(block: BlockBase, scope: BlockScope): boolean {
+  const visibility = block.visibility;
+  if (visibility === undefined || !scope.inPackageCard) return true;
+  if (visibility === 'selected') return scope.selected;
+  if (visibility === 'unselected') return !scope.selected;
+  // A visibility value this SDK does not know: draw rather than hide, the
+  // same way an unknown style field is ignored.
+  return true;
+}
+
+/** Makes a card its package's selection target. Deliberately no pressed
+ *  feedback: the card's `selectedStyle` is its answer to a tap. */
 function makeSelectable(node: HTMLElement, ctx: BlockRenderContext, packageId: string): void {
   if (!ctx.onSelect) return;
   node.style.cursor = 'pointer';
   node.addEventListener('click', () => ctx.onSelect?.(packageId));
+}
+
+// ——— the renderer's own stylesheet ———
+
+const BLOCK_STYLE_ID = 'rvx-block-styles';
+const BUTTON_CLASS = 'rvx-block-button';
+const SPINNER_CLASS = 'rvx-block-spinner';
+
+/** The handful of rules inline styles cannot express: the pressed state of a
+ *  button (`:active`, so it works for touch as well as a pointer and needs no
+ *  hover) and the spinner's animation. Injected once per document. */
+const BLOCK_CSS = `
+.${BUTTON_CLASS}:active { opacity: 0.8; }
+.${BUTTON_CLASS}[disabled] { cursor: default; }
+.${SPINNER_CLASS} { animation: rvx-block-spin 0.8s linear infinite; }
+@keyframes rvx-block-spin { to { transform: rotate(360deg); } }
+`;
+
+export function ensureBlockStyles(document: Document): void {
+  if (document.getElementById(BLOCK_STYLE_ID)) return;
+  const style = document.createElement('style');
+  style.id = BLOCK_STYLE_ID;
+  style.textContent = BLOCK_CSS;
+  (document.head ?? document.documentElement).appendChild(style);
 }
 
 /**
@@ -866,14 +1027,16 @@ function makeClosable(node: HTMLElement, ctx: BlockRenderContext, action: BlockA
  * `packageIndex` card is hidden when the offering does not reach that index,
  * so a close authored inside one MIGHT not appear. Counting it would suppress
  * the fallback and leave the customer with no way out — the exact bug this
- * feature exists to fix.
+ * feature exists to fix. A block with `visibility` set is conditional in the
+ * same way (render contract v2) and is skipped for the same reason.
  */
 export function hasCloseAction(blocks: PaywallBlock[]): boolean {
-  return blocks.some((b) =>
-    b.type === 'card'
+  return blocks.some((b) => {
+    if (typeof b !== 'object' || b === null || b.visibility !== undefined) return false;
+    return b.type === 'card'
       ? b.repeat === undefined && b.packageIndex === undefined && hasCloseAction(b.children)
-      : (b.type === 'text' || b.type === 'image' || b.type === 'button') && b.action === 'close',
-  );
+      : (b.type === 'text' || b.type === 'image' || b.type === 'button') && b.action === 'close';
+  });
 }
 
 function div(doc: Document, tag = 'div'): HTMLElement {
@@ -898,15 +1061,40 @@ export function renderBlock(
   block: PaywallBlock,
   ctx: BlockRenderContext,
   document: Document,
-  pkg?: BlockPackage,
+  parent: BlockScope = rootScope(ctx),
 ): HTMLElement | null {
   if (typeof block !== 'object' || block === null) return null;
+  // A package card is judged in the scope it opens (its own package selected
+  // or not); everything else in the scope it inherits. A `repeat` card is
+  // judged per instance, inside renderCard.
+  if (!isVisible(block, resolveSelectedContext(block, ctx, parent))) return null;
+  const node = renderBlockIn(block, ctx, document, parent);
+  // The id travels into the DOM so a host (and the contract tests) can find a
+  // block by the name the design gave it. A `repeat` wrapper is display:
+  // contents and stamps its instances instead.
+  if (node && typeof block.id === 'string' && node.style.display !== 'contents') {
+    node.setAttribute('data-block-id', block.id);
+  }
+  return node;
+}
+
+function renderBlockIn(
+  block: PaywallBlock,
+  ctx: BlockRenderContext,
+  document: Document,
+  parent: BlockScope,
+): HTMLElement | null {
   const { doc, packages } = ctx;
+  // Every block but a package card draws in its parent's scope; a package
+  // card opens its own (renderCard handles the per-instance `repeat` case).
+  const scope = resolveSelectedContext(block, ctx, parent);
+  const pkg = scope.pkg;
+  const style = effectiveStyle(block, scope);
 
   switch (block.type) {
     case 'text': {
       const node = div(document);
-      const s = block.style;
+      const s = style;
       // A text block that asks for cross/main-axis alignment (the ×-close
       // chip, centered badges) is a flex box in the source design; without
       // display:flex those properties are inert and the glyph sits top-left.
@@ -920,7 +1108,7 @@ export function renderBlock(
     case 'image': {
       const node = div(document);
       const url = block.url || ctx.heroImageUrl;
-      const s = block.style;
+      const s = style;
       // The 160px/16px defaults suit a slot dropped into a flow column; a
       // converted design sizes its own slot, and the defaults must not fight it.
       const sized =
@@ -930,7 +1118,15 @@ export function renderBlock(
           s.aspectRatio !== undefined ||
           (s.top !== undefined && s.bottom !== undefined) ||
           s.flex !== undefined);
+      // A full-screen photo: the design's own art, and the first thing the
+      // customer sees. It fills its stack parent on both axes and is fetched
+      // and decoded eagerly, so nothing about it changes first paint.
+      const fullScreen = s !== undefined && (Boolean(s.inset) || (s.top !== undefined && s.bottom !== undefined));
       if (!sized) node.style.height = '160px';
+      if (s?.inset) {
+        node.style.width = '100%';
+        node.style.height = '100%';
+      }
       node.style.borderRadius = block.shape === 'circle' ? '50%' : sized ? '0' : '16px';
       node.style.overflow = 'hidden';
       node.style.flexShrink = '0';
@@ -943,6 +1139,13 @@ export function renderBlock(
         img.style.height = '100%';
         img.style.objectFit = block.fit ?? 'cover';
         img.style.display = 'block';
+        if (!fullScreen) {
+          // An in-flow slot may sit below the fold; let the WebView defer it
+          // and decode it off the main thread. Attributes rather than the
+          // properties: a WebView that predates them ignores an attribute.
+          img.setAttribute('loading', 'lazy');
+          img.setAttribute('decoding', 'async');
+        }
         node.appendChild(img);
       } else {
         const slot = div(document);
@@ -961,9 +1164,9 @@ export function renderBlock(
       const node = div(document);
       node.style.display = 'flex';
       node.style.flexDirection = 'column';
-      node.style.gap = px(block.style?.gap ?? 8);
+      node.style.gap = px(style?.gap ?? 8);
       node.style.textAlign = 'left';
-      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
       const items = Array.isArray(block.items) ? block.items : [];
       for (const item of items) {
         const row = div(document);
@@ -996,18 +1199,24 @@ export function renderBlock(
     }
 
     case 'products':
-      return renderProducts(block, ctx, document);
+      return renderProducts(block, ctx, document, style);
 
     case 'button': {
       const node = div(document, 'button');
       (node as HTMLButtonElement).type = 'button';
+      node.className = BUTTON_CLASS;
       // A converted CTA sizes itself with an explicit height and centers with
       // flex; the padded default is only for buttons added by hand.
-      const sized = block.style?.height !== undefined;
+      const sized = style?.height !== undefined;
       // A button the design marks as the close dismisses instead of buying,
       // and takes no accent fill: the CTA must stay the one accented thing on
       // the screen, or a "Not now" competes with "Subscribe" for the eye.
       const closes = block.action === 'close' && ctx.onClose !== undefined;
+      // A purchase in flight (render contract v2 §4): the button disables,
+      // hides its label and spins in its place. It keeps its size and fill —
+      // the spinner is centred over a hidden label, not swapped in for it —
+      // so the screen does not reflow while the store answers.
+      const loading = !closes && ctx.loading === true;
       node.style.background = closes ? 'transparent' : doc.accent;
       node.style.color = closes ? doc.textColor : doc.accentInk;
       node.style.borderRadius = '12px';
@@ -1021,8 +1230,31 @@ export function renderBlock(
       node.style.textAlign = 'center';
       node.style.cursor = 'pointer';
       node.style.font = node.style.font || '';
-      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
-      node.textContent = resolveTags(String(block.label ?? ''), pkg, packages);
+      // The spinner is absolutely centred, so the button must be its
+      // containing block. Set before the design's own style so a pinned
+      // (absolute) button keeps its placement.
+      if (loading) node.style.position = 'relative';
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
+      const text = resolveTags(String(block.label ?? ''), pkg, packages);
+      if (loading) {
+        const label = div(document, 'span');
+        label.textContent = text;
+        label.style.visibility = 'hidden';
+        node.appendChild(label);
+        const spinner = div(document);
+        spinner.className = SPINNER_CLASS;
+        spinner.style.cssText =
+          'position:absolute;top:0;right:0;bottom:0;left:0;margin:auto;width:20px;height:20px;' +
+          'border-radius:50%;border-width:2px;border-style:solid;pointer-events:none';
+        spinner.style.borderColor = doc.accentInk;
+        spinner.style.borderTopColor = 'transparent';
+        node.appendChild(spinner);
+        (node as HTMLButtonElement).disabled = true;
+        node.setAttribute('aria-disabled', 'true');
+        node.setAttribute('aria-busy', 'true');
+      } else {
+        node.textContent = text;
+      }
       if (closes) {
         makeClosable(node, ctx, block.action);
       } else if (ctx.onPurchase) {
@@ -1032,6 +1264,9 @@ export function renderBlock(
           // selection handler — charging the previously selected package and
           // only then moving the selection onto the one just clicked.
           event.stopPropagation();
+          // `disabled` already swallows the tap while loading; this is the
+          // guard for a synthetic click that bypasses it.
+          if (ctx.loading) return;
           const id = selectedPackageId(ctx);
           if (id !== undefined) ctx.onPurchase?.(id);
         });
@@ -1053,7 +1288,7 @@ export function renderBlock(
       node.style.gap = '20px';
       node.style.fontSize = '12px';
       node.style.opacity = '0.65';
-      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
       for (const entry of entries) {
         // An explicit host handler wins over the config URL — the app knows
         // best how to open its own legal pages; the URL is the fallback.
@@ -1096,7 +1331,7 @@ export function renderBlock(
       node.style.height = '1px';
       node.style.background = 'currentColor';
       node.style.opacity = '0.16';
-      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
       return node;
     }
 
@@ -1106,13 +1341,13 @@ export function renderBlock(
         node.style.flex = '1';
       } else {
         node.style.height = '16px';
-        applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
+        applyBlockStyle(node, style, doc, ctx.onDiagnostic);
       }
       return node;
     }
 
     case 'card':
-      return renderCard(block, ctx, document, pkg);
+      return renderCard(block, ctx, document, parent);
 
     default:
       // An unknown block type from a newer dashboard: skip this node, keep
@@ -1121,7 +1356,7 @@ export function renderBlock(
   }
 }
 
-function containerBase(block: CardBlock, node: HTMLElement): void {
+function containerBase(block: CardBlock, node: HTMLElement, style: BlockStyle | undefined): void {
   const layout = block.layout ?? 'column';
   // Every container is a positioning context, so a child pinned with
   // top/right offsets (a SAVE badge on a plan card) anchors to its own card
@@ -1131,31 +1366,29 @@ function containerBase(block: CardBlock, node: HTMLElement): void {
   if (layout === 'grid') {
     node.style.display = 'grid';
     node.style.gridTemplateColumns = block.gridColumns ?? `repeat(${block.columns ?? 2}, minmax(0, 1fr))`;
-    node.style.gap = px(block.style?.gap ?? 10);
+    node.style.gap = px(style?.gap ?? 10);
     return;
   }
   // column / row — and any layout value this SDK does not know, which falls
   // back to a column rather than rendering nothing.
   node.style.display = 'flex';
   node.style.flexDirection = layout === 'row' ? 'row' : 'column';
-  node.style.gap = px(block.style?.gap ?? 10);
+  node.style.gap = px(style?.gap ?? 10);
 }
 
 function renderCard(
   block: CardBlock,
   ctx: BlockRenderContext,
   document: Document,
-  pkg?: BlockPackage,
+  parent: BlockScope,
 ): HTMLElement | null {
   const { doc, packages } = ctx;
   const layout = block.layout ?? 'column';
   const children = Array.isArray(block.children) ? block.children : [];
 
-  const selectedId = selectedPackageId(ctx);
-
-  const fill = (node: HTMLElement, ctxPkg: BlockPackage | undefined) => {
+  const fill = (node: HTMLElement, scope: BlockScope) => {
     for (const child of children) {
-      const rendered = renderBlock(child, ctx, document, ctxPkg);
+      const rendered = renderBlock(child, ctx, document, scope);
       if (rendered) node.appendChild(rendered);
     }
   };
@@ -1167,13 +1400,18 @@ function renderCard(
     const wrapper = div(document);
     wrapper.style.display = 'contents';
     for (const p of list) {
+      // Each instance opens its own scope: the selected package's instance
+      // takes `selectedStyle`, and its descendants see `selected` too.
+      const scope = packageScope(ctx, p);
+      if (!isVisible(block, scope)) continue;
+      const style = effectiveStyle(block, scope);
       const node = div(document);
-      containerBase(block, node);
+      containerBase(block, node, style);
       if (layout !== 'stack') node.style.borderRadius = '16px';
-      applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
-      if (p && p.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc, ctx.onDiagnostic);
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
       if (p) makeSelectable(node, ctx, p.packageId);
-      fill(node, p);
+      if (typeof block.id === 'string') node.setAttribute('data-block-id', block.id);
+      fill(node, scope);
       wrapper.appendChild(node);
     }
     return wrapper;
@@ -1185,26 +1423,32 @@ function renderCard(
     return null;
   }
 
-  const node = div(document);
-  containerBase(block, node);
-  if (layout !== 'stack') node.style.borderRadius = '16px';
-  applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
   // A card pinned to a package doubles as its selection target — that is how
   // hand-styled plan rows (a highlighted annual beside a plain monthly) become
-  // tappable without a products block. It takes `selectedStyle` when selected
-  // for the same reason a repeated card does, or tapping it would change what
-  // the CTA buys with no visible answer. A card that names no package is
-  // decoration and stays inert.
+  // tappable without a products block. It opens the selected context for its
+  // subtree: it takes `selectedStyle` when selected, or tapping it would
+  // change what the CTA buys with no visible answer, and every descendant
+  // (a radio dot, a "Selected" caption) answers to the same state. A card
+  // that names no package is decoration, stays inert and inherits its
+  // parent's scope.
+  const scope = resolveSelectedContext(block, ctx, parent);
+  const style = effectiveStyle(block, scope);
+  const node = div(document);
+  containerBase(block, node, style);
+  if (layout !== 'stack') node.style.borderRadius = '16px';
+  applyBlockStyle(node, style, doc, ctx.onDiagnostic);
   const pinned = block.packageIndex !== undefined ? packages[block.packageIndex] : undefined;
-  if (pinned) {
-    if (pinned.packageId === selectedId) applyBlockStyle(node, block.selectedStyle, doc, ctx.onDiagnostic);
-    makeSelectable(node, ctx, pinned.packageId);
-  }
-  fill(node, pinned ?? pkg);
+  if (pinned) makeSelectable(node, ctx, pinned.packageId);
+  fill(node, scope);
   return node;
 }
 
-function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document: Document): HTMLElement {
+function renderProducts(
+  block: ProductsBlock,
+  ctx: BlockRenderContext,
+  document: Document,
+  style: BlockStyle | undefined,
+): HTMLElement {
   const { doc, packages } = ctx;
   const shown = packages;
   const hlId = selectedPackageId(ctx);
@@ -1213,8 +1457,8 @@ function renderProducts(block: ProductsBlock, ctx: BlockRenderContext, document:
   const node = div(document);
   node.style.display = 'flex';
   node.style.flexDirection = row ? 'row' : 'column';
-  node.style.gap = px(block.style?.gap ?? 8);
-  applyBlockStyle(node, block.style, doc, ctx.onDiagnostic);
+  node.style.gap = px(style?.gap ?? 8);
+  applyBlockStyle(node, style, doc, ctx.onDiagnostic);
 
   for (const pkg of shown) {
     const hl = pkg.packageId === hlId;
@@ -1337,6 +1581,7 @@ function backgroundArt(layers: BackgroundLayers, document: Document): HTMLDivEle
  */
 export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTMLDivElement {
   const { doc } = ctx;
+  ensureBlockStyles(document);
   const screen = box(document);
   const layers = backgroundLayers(doc.background, (v) => resolveColor(v, doc) ?? v);
   if (layers.ground !== undefined) screen.style.background = layers.ground;
@@ -1373,11 +1618,12 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
 
   if (doc.layout === 'canvas') {
     // Laid out at 1× and scaled, so absolute placement inside `stack`
-    // containers stays true at any width. The converted designs were drawn
-    // against the UA default line height; the host page's own could stretch
-    // every label that does not declare one.
+    // containers stays true at any width (render contract v2 §3). The
+    // converted designs were drawn against the UA default line height; the
+    // host page's own could stretch every label that does not declare one.
     screen.style.position = 'relative';
     screen.style.width = '100%';
+    screen.style.flexShrink = '0';
     screen.style.overflow = 'hidden';
     body.style.position = 'absolute';
     body.style.top = '0';
@@ -1388,12 +1634,25 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     body.style.lineHeight = 'normal';
     body.style.zIndex = '1';
     screen.appendChild(body);
+    const viewport = ctx.viewport;
+    const measured = viewport ?? screen;
     const fit = () => {
-      const width = screen.clientWidth;
+      const width = measured.clientWidth;
       if (width <= 0) return;
-      const scale = width / DESIGN_CANVAS.width;
-      body.style.transform = `scale(${scale})`;
-      screen.style.height = `${DESIGN_CANVAS.height * scale}px`;
+      const height = viewport ? viewport.clientHeight : (document.defaultView?.innerHeight ?? 0);
+      const m = canvasMetrics(width, height);
+      body.style.transform = `scale(${m.scale})`;
+      // Centred when the viewport is wider than the design can grow; the
+      // extra height is in DESIGN units so the scale maps it exactly.
+      body.style.left = `${m.left}px`;
+      body.style.height = `${m.designHeight}px`;
+      screen.style.height = `${m.height}px`;
+      if (viewport) {
+        // Scrolling only when the design is taller than the viewport; when it
+        // fits, a drag must neither scroll nor bounce the artwork.
+        viewport.style.overflowY = m.overflows ? 'auto' : 'hidden';
+        viewport.style.overscrollBehavior = m.overflows ? '' : 'none';
+      }
     };
     if (closeChip) screen.appendChild(closeChip);
     fit();
@@ -1401,7 +1660,7 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     // overlay measures 0), so re-fit when it gets a size. ResizeObserver is
     // absent in older WebViews — the initial fit still applies there.
     const RO = (document.defaultView as unknown as { ResizeObserver?: typeof ResizeObserver })?.ResizeObserver;
-    if (typeof RO === 'function') new RO(fit).observe(screen);
+    if (typeof RO === 'function') new RO(fit).observe(measured);
     return screen;
   }
 
@@ -1439,6 +1698,11 @@ function fallbackClose(ctx: BlockRenderContext, document: Document): HTMLElement
     'position:absolute;top:14px;right:14px;z-index:50;width:30px;height:30px;' +
     'display:flex;align-items:center;justify-content:center;border:none;border-radius:999px;' +
     'font-size:17px;line-height:1;cursor:pointer;padding:0';
+  // The canvas is full-bleed under the status bar, so the chip clears the
+  // safe area in unscaled points (render contract v2 §3). The plain 14px above
+  // stays as the fallback: a WebView without env() rejects this assignment
+  // and keeps the previous value.
+  node.style.top = 'calc(14px + env(safe-area-inset-top))';
   node.style.color = doc.textColor;
   // color-mix keeps the wash tied to the design's ink; a WebView too old for
   // it falls back to the transparent default, leaving a bare glyph that is

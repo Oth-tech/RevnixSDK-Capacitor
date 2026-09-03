@@ -281,12 +281,19 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           doc: blockDoc,
           packages: shown,
           highlightPackageId: selectedId,
+          // The tree draws the in-flight state itself (disabled CTA, spinner);
+          // withholding the handler alone would leave a button that looks
+          // live and does nothing.
+          loading: o.loading,
+          viewport: this.scroll,
           heroImageUrl: o.config.heroImageUrl,
           footer: { termsUrl: o.config.footer?.termsUrl, privacyUrl: o.config.footer?.privacyUrl },
           onRestore: o.onRestore,
           onTerms: o.onTerms,
           onPrivacy: o.onPrivacy,
-          onPurchase: o.loading ? undefined : (packageId) => o.onPurchase(packageId),
+          onPurchase: (packageId) => {
+            if (!this.options.loading) o.onPurchase(packageId);
+          },
           onSelect: (packageId) => this.select(packageId),
           onClose: o.onClose ? () => this.close() : undefined,
           onDiagnostic: o.onDiagnostic,
@@ -302,6 +309,10 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     }
 
     this.root.style.backgroundColor = '';
+    // A canvas design is full-bleed: it scales to the scroll box's own width
+    // and paints its background across the whole of it, so the classic
+    // layouts' safe-area padding must not frame it.
+    this.setCanvasHost(blockDoc.layout === 'canvas');
     if (this.content) {
       this.content.replaceWith(next);
     } else {
@@ -317,6 +328,18 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
   /** The classic layouts' own close chip, so re-renders replace rather than
    *  stack it (REV-252). */
   private classicClose?: HTMLElement;
+
+  /** Switches the scroll box between framing a column (padded, vertically
+   *  centred) and hosting a full-bleed canvas design. The canvas renderer
+   *  toggles the box's scrolling itself; leaving a canvas clears that so the
+   *  classic layouts scroll again. */
+  private setCanvasHost(canvas: boolean): void {
+    this.scrollContent.classList.toggle('rvx-paywall-scroll-content--canvas', canvas);
+    if (!canvas) {
+      this.scroll.style.overflowY = '';
+      this.scroll.style.overscrollBehavior = '';
+    }
+  }
 
   /**
    * The dismiss affordance the classic layouts get.
@@ -381,6 +404,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     const o = this.options;
     const { config, packages, loading } = o;
     const doc = this.root.ownerDocument;
+    this.setCanvasHost(false);
 
     // Base scheme comes from the dashboard config (mode: dark|light, absent =
     // dark for legacy configs); the host's explicit theme option wins on top.
@@ -929,6 +953,9 @@ const PAYWALL_CSS = `
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  /* No scroll chaining: when the content fits, a drag must not bounce the
+     host page behind the paywall. */
+  overscroll-behavior: contain;
 }
 .rvx-paywall-scroll::-webkit-scrollbar { display: none; }
 .rvx-paywall-scroll-content {
@@ -939,6 +966,10 @@ const PAYWALL_CSS = `
   padding: max(28px, env(safe-area-inset-top)) max(24px, env(safe-area-inset-right))
     max(32px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left));
 }
+/* A canvas design is full-bleed under the status bar (it pads its own bottom
+   inset) and fills the viewport; the renderer places its own close chip
+   clear of the safe area. */
+.rvx-paywall-scroll-content--canvas { padding: 0; }
 .rvx-paywall-content {
   display: flex;
   flex-direction: column;
