@@ -21,7 +21,7 @@
 // 'revnix-capacitor'`. The host container must have a height (a full-screen
 // overlay is the usual shape); the paywall fills it and scrolls internally.
 
-import type { PaywallConfig } from './definitions';
+import type { PaywallConfig, RevnixPaywallEvent } from './definitions';
 import { asBlockDoc, renderBlockDoc } from './blocks';
 import type { PaywallBlockDoc } from './blocks';
 
@@ -40,6 +40,11 @@ export interface RevnixPaywallPackage {
    *  `minorUnitsForCurrency` before converting from major units. */
   amountMinor?: number;
   currency?: string;
+  /** REV-263: the catalog product behind this package. Only telemetry reads
+   *  it — a `selected` or `purchase_started` report names the plan the way the
+   *  rest of the ledger does. Optional: without it the interaction is still
+   *  reported, just with no plan attached. */
+  productId?: string;
 }
 
 /** Colors the paywall renders with. Defaults mirror the dashboard preview
@@ -136,6 +141,19 @@ export interface RevnixPaywallOptions {
       placementKey?: string;
       paywallId?: string;
     }) => void | Promise<void>;
+    /** REV-263: the interaction vocabulary. Optional so a host on an older
+     *  plugin still renders and still reports views — it just reports none of
+     *  the six. */
+    logPaywallEvent?: (options: {
+      event: RevnixPaywallEvent;
+      viewId: string;
+      placementKey?: string;
+      paywallId?: string;
+      productId?: string;
+      code?: string;
+      message?: string;
+      eventId?: string;
+    }) => void | Promise<void>;
   };
   /** Placement/paywall attribution attached to the view report. */
   placementKey?: string;
@@ -202,6 +220,15 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           return typeof id === 'string' ? id : undefined;
         })
         .catch(() => undefined);
+      // REV-263: an offering with nothing to sell is the one failure the
+      // renderer can see by itself, and the one most worth knowing about —
+      // the paywall painted, the customer could not buy.
+      if (this.options.packages.length === 0) {
+        this.report('error', {
+          code: 'no_products',
+          message: 'paywall displayed with no packages',
+        });
+      }
     }
   }
 
@@ -247,8 +274,78 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     this.root.remove();
   }
 
+  // ——— REV-263: the interaction vocabulary ———
+  //
+  // The renderer reports what it genuinely OBSERVES: the selection change, the
+  // CTA press, the restore press, and an offering that arrived with nothing to
+  // sell. It never reports the purchase OUTCOME — the store call happens in
+  // the host, so only the host knows whether the customer cancelled at the
+  // sheet or the payment was refused. Report those with
+  // `Revnix.logPaywallEvent(...)` from your own purchase error handling.
+  private report(
+    event: RevnixPaywallEvent,
+    extra?: { productId?: string; code?: string; message?: string; eventId?: string },
+  ): void {
+    const { client, placementKey, paywallId, disableViewTracking } = this.options;
+    const report = this.viewReport;
+    if (!client?.logPaywallEvent || disableViewTracking || report === undefined) return;
+    // Awaiting the view beacon for the same reason the close does: an
+    // interaction reported before the display id exists could not be tied to
+    // the display it happened on.
+    void report
+      .then((viewId) =>
+        viewId === undefined
+          ? undefined
+          : client.logPaywallEvent?.({
+              event,
+              viewId,
+              placementKey,
+              paywallId,
+              ...extra,
+              ...(extra?.eventId ? { eventId: `${viewId}:${extra.eventId}` } : {}),
+            }),
+      )
+      .catch(() => undefined);
+  }
+
+  /** The catalog product behind a package, so a report names the plan the way
+   *  the rest of the ledger does. Undefined when the offering did not carry
+   *  one — reporting the package id instead would look like a product that
+   *  does not exist. */
+  private productIdFor(packageId: string): string | undefined {
+    return this.options.packages.find((p) => p.packageId === packageId)?.productId;
+  }
+
+  /** Rises per CTA press, so a retry after a failure is its own occurrence
+   *  rather than a duplicate of the first try. */
+  private purchaseAttempts = 0;
+
+  /** Every CTA path routes through here, so the start report can never be
+   *  wired on one render path and forgotten on the other. */
+  private purchase(packageId: string): void {
+    this.purchaseAttempts += 1;
+    this.report('purchase_started', {
+      productId: this.productIdFor(packageId),
+      eventId: `buy:${this.purchaseAttempts}`,
+    });
+    this.options.onPurchase(packageId);
+  }
+
+  /** Restore — the report rides along with the host's handler. */
+  private restore(): void {
+    this.report('restore');
+    this.options.onRestore?.();
+  }
+
   private select(packageId: string): void {
     this.internalSelected = packageId;
+    // One report per (display, package): a customer toggling monthly → yearly
+    // → monthly weighed two plans, not three, and the server's default key
+    // (the viewId alone) would keep only the first.
+    this.report('selected', {
+      productId: this.productIdFor(packageId),
+      eventId: `sel:${packageId}`,
+    });
     this.options.onSelectPackage?.(packageId);
     this.render();
   }
@@ -288,11 +385,11 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           viewport: this.scroll,
           heroImageUrl: o.config.heroImageUrl,
           footer: { termsUrl: o.config.footer?.termsUrl, privacyUrl: o.config.footer?.privacyUrl },
-          onRestore: o.onRestore,
+          onRestore: o.onRestore ? () => this.restore() : undefined,
           onTerms: o.onTerms,
           onPrivacy: o.onPrivacy,
           onPurchase: (packageId) => {
-            if (!this.options.loading) o.onPurchase(packageId);
+            if (!this.options.loading) this.purchase(packageId);
           },
           onSelect: (packageId) => this.select(packageId),
           onClose: o.onClose ? () => this.close() : undefined,
@@ -436,7 +533,12 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     // (rendered as a plain target=_blank anchor).
     const footer = config.footer;
     const footerItems = [
-      { show: footer?.showRestore ?? true, label: 'Restore', onPress: o.onRestore, url: undefined },
+      {
+        show: footer?.showRestore ?? true,
+        label: 'Restore',
+        onPress: o.onRestore ? () => this.restore() : undefined,
+        url: undefined,
+      },
       { show: footer?.showTerms ?? true, label: 'Terms', onPress: o.onTerms, url: footer?.termsUrl },
       { show: footer?.showPrivacy ?? true, label: 'Privacy', onPress: o.onPrivacy, url: footer?.privacyUrl },
     ].filter((item) => item.show);
@@ -780,7 +882,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
       button.style.backgroundColor = accent;
       button.disabled = Boolean(loading) || !selectedId;
       button.addEventListener('click', () => {
-        if (!this.options.loading && selectedId) this.options.onPurchase(selectedId);
+        if (!this.options.loading && selectedId) this.purchase(selectedId);
       });
       if (loading) {
         const spinner = el(doc, 'rvx-paywall-spinner');

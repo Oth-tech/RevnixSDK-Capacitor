@@ -12,6 +12,7 @@ import com.revnix.RegisterPurchaseResult
 import com.revnix.RevnixClient
 import com.revnix.RevnixConfig
 import com.revnix.RevnixError
+import com.revnix.RevnixPaywallEvent
 import com.revnix.RevnixStore
 import com.revnix.android.AndroidStorage
 import com.revnix.android.PlayBillingConnector
@@ -259,6 +260,44 @@ class RevnixPlugin : Plugin() {
                 viewId = viewId,
                 placementKey = placementKey,
                 paywallId = paywallId,
+            )
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun logPaywallEvent(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val viewId = call.getString("viewId")
+        if (viewId == null) {
+            call.reject("viewId is required", "invalid")
+            return
+        }
+        // REV-263: the wire name maps 1:1 onto the enum's wireName. Rejected
+        // rather than silently dropped — an unknown name is a caller bug, and
+        // the same string would have been a 400 at the API.
+        val event = RevnixPaywallEvent.entries
+            .firstOrNull { it.wireName == call.getString("event") }
+        if (event == null) {
+            call.reject("event must be one of the six paywall interactions", "invalid")
+            return
+        }
+        val placementKey = call.getString("placementKey")
+        val paywallId = call.getString("paywallId")
+        val productId = call.getString("productId")
+        val code = call.getString("code")
+        val message = call.getString("message")
+        val eventId = call.getString("eventId")
+        scope.launch {
+            active.logPaywallEvent(
+                event = event,
+                viewId = viewId,
+                placementKey = placementKey,
+                paywallId = paywallId,
+                productId = productId,
+                code = code,
+                message = message,
+                eventId = eventId,
             )
             call.resolve()
         }

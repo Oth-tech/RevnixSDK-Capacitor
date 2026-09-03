@@ -33,6 +33,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "registerInstall", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallShown", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
     ]
 
@@ -256,6 +257,41 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         Task {
             await client.logPaywallClosed(
                 viewId: viewId, placementKey: placementKey, paywallId: paywallId)
+            call.resolve()
+        }
+    }
+
+    @objc func logPaywallEvent(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let viewId = call.getString("viewId") else {
+            call.reject("viewId is required", "invalid")
+            return
+        }
+        // REV-263: the wire name maps 1:1 onto the enum's rawValue. Rejected
+        // rather than silently dropped — an unknown name is a caller bug, and
+        // the same string would have been a 400 at the API.
+        guard let raw = call.getString("event"),
+            let event = RevnixPaywallEvent(rawValue: raw)
+        else {
+            call.reject("event must be one of the six paywall interactions", "invalid")
+            return
+        }
+        let placementKey = call.getString("placementKey")
+        let paywallId = call.getString("paywallId")
+        let productId = call.getString("productId")
+        let code = call.getString("code")
+        let message = call.getString("message")
+        let eventId = call.getString("eventId")
+        Task {
+            await client.logPaywallEvent(
+                event,
+                viewId: viewId,
+                placementKey: placementKey,
+                paywallId: paywallId,
+                productId: productId,
+                code: code,
+                message: message,
+                eventId: eventId)
             call.resolve()
         }
     }
