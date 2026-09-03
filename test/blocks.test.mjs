@@ -174,6 +174,14 @@ describe('tag variables resolve against the live packages', () => {
     assert.match(resolveTags('{price_per_month}', yen, [yen]), /1,000/);
   });
 
+  test('a tag outside any package card reads the selected package, not the literal', () => {
+    // Render contract v2 §2: the renewal-disclosure line every template
+    // carries sits at the root, and it must show the price the CTA buys.
+    const line = { id: 'f', type: 'text', text: 'then {price}/{period_short}' };
+    assert.equal(render([line]).textContent, 'then $59.99/yr');
+    assert.equal(render([line], { highlightPackageId: 'monthly' }).textContent, 'then $9.99/mo');
+  });
+
   test('tags render inside a repeated plan card, one package each', () => {
     const screen = render([
       {
