@@ -297,9 +297,14 @@ jobs:
       - name: Check the tarball carries the native SDKs
         run: |
           npm ci
+          # npm 11 prints `[{ files }]`; npm 12 prints `{ "<name>": { files } }`.
+          # The runner installs npm@latest, so accept either rather than pin
+          # to whichever shape happened to be current.
           LIST=$(npm pack --dry-run --json | node -e '
             let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
-              console.log(JSON.parse(s)[0].files.map((f) => f.path).join("\n"));
+              const json = JSON.parse(s);
+              const pkg = Array.isArray(json) ? json[0] : Object.values(json)[0];
+              console.log(pkg.files.map((f) => f.path).join("\n"));
             });')
           for NEED in "ios/Revnix/Sources/Revnix/" "android/revnix-kotlin/revnix-core/src/main/" "android/revnix-kotlin/revnix-android/src/main/" "dist/plugin.cjs.js"; do
             if ! echo "$LIST" | grep -q "^$NEED"; then
