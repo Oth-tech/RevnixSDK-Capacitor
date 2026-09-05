@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.0 (2026-09-05)
+
 ### Added
 
 - **`logPaywallEvent` — the six paywall interactions** (`selected`,
@@ -41,6 +43,8 @@
   `paywallJson`), so a designed paywall from a newer dashboard reaches JS
   untouched.
 - **iOS deployment target is 16.0** (was 15.0), revnix-swift's floor.
+- Native SDKs: RevnixSDK-iOS 3a2cab2 → 9b43d10, RevnixSDK-Android be5b5c2 → d5ad877.
+- Web: revnix-react ^0.12.0 → ^1.1.0.
 
 ## 0.2.0
 
