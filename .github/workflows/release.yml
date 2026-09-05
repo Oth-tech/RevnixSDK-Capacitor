@@ -68,7 +68,7 @@ jobs:
       # `git push` of the release branch below would then be refused. Leaving
       # checkout on the default token keeps that push working.
       - uses: actions/create-github-app-token@v2
-        id: natives
+        id: natives_token
         with:
           app-id: ${{ secrets.SDK_RELEASE_APP_ID }}
           private-key: ${{ secrets.SDK_RELEASE_APP_PRIVATE_KEY }}
@@ -79,7 +79,7 @@ jobs:
 
       - name: Lend the App's token to the native submodule remotes
         env:
-          NATIVES_TOKEN: ${{ steps.natives.outputs.token }}
+          NATIVES_TOKEN: ${{ steps.natives_token.outputs.token }}
         run: |
           for REPO in RevnixSDK-iOS RevnixSDK-Android; do
             git config --global \
