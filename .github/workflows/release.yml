@@ -57,6 +57,36 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      # The two native submodules live in PRIVATE repos, which this repo's own
+      # GITHUB_TOKEN cannot read — a recursive checkout fails on them with
+      # "Repository not found". The release App can read them, so it lends a
+      # token for exactly those two clone URLs.
+      #
+      # Scoped with `insteadOf` per repository rather than a checkout `token:`
+      # override on purpose: an override would also persist the App's
+      # credentials for THIS repo's remote, and the App is Contents:read — the
+      # `git push` of the release branch below would then be refused. Leaving
+      # checkout on the default token keeps that push working.
+      - uses: actions/create-github-app-token@v2
+        id: natives
+        with:
+          app-id: ${{ secrets.SDK_RELEASE_APP_ID }}
+          private-key: ${{ secrets.SDK_RELEASE_APP_PRIVATE_KEY }}
+          owner: Oth-tech
+          repositories: |
+            RevnixSDK-iOS
+            RevnixSDK-Android
+
+      - name: Lend the App's token to the native submodule remotes
+        env:
+          NATIVES_TOKEN: ${{ steps.natives.outputs.token }}
+        run: |
+          for REPO in RevnixSDK-iOS RevnixSDK-Android; do
+            git config --global \
+              "url.https://x-access-token:${NATIVES_TOKEN}@github.com/Oth-tech/${REPO}.git.insteadOf" \
+              "https://github.com/Oth-tech/${REPO}.git"
+          done
+
       - uses: actions/checkout@v4
         with:
           ref: main
