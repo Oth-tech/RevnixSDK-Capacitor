@@ -134,13 +134,13 @@ handle.destroy(); // remove from the DOM when dismissed
 
 </docgen-index>
 
-<docgen-api>
-<!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
-
 Failure taxonomy: rejected calls carry `code` (network · timeout ·
 rate_limited · server · bad_response · auth · not_found · purchase_blocked
 · invalid) and `data.isRetryable`. Deliberate rejections (401/403/404/409)
 are never masked by a cache: a kill-switch must stay a kill-switch.
+
+<docgen-api>
+<!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
 
 ### configure(...)
 
@@ -695,8 +695,6 @@ close or purchase that ended it. The server turns each into the ledger type
 
 Construct a type with a set of properties K of type T
 
-<code>{
- [P in K]: T;
- }</code>
+<code>{ [P in K]: T; }</code>
 
 </docgen-api>
