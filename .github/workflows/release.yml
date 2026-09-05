@@ -7,7 +7,8 @@
 #   * moves the native submodules (ios/Revnix → RevnixSDK-iOS,
 #     android/revnix-kotlin → RevnixSDK-Android) to their upstream main, and
 #     records the move in the changelog. The npm tarball ships those sources
-#     (see `files` in package.json), so the checkout is recursive throughout;
+#     (see `files` in package.json), so they are checked out throughout — with
+#     the release App's token, since both native repos are private;
 #   * follows revnix-react: the web implementation delegates to it, so the
 #     dependency is bumped to the version the caller just released (or the
 #     latest on npm when run by hand);
@@ -58,15 +59,15 @@ jobs:
       GH_TOKEN: ${{ github.token }}
     steps:
       # The two native submodules live in PRIVATE repos, which this repo's own
-      # GITHUB_TOKEN cannot read — a recursive checkout fails on them with
-      # "Repository not found". The release App can read them, so it lends a
-      # token for exactly those two clone URLs.
+      # GITHUB_TOKEN cannot read — a recursive checkout fails on both with
+      # "Repository not found", which is how GitHub words "you cannot see
+      # this". The release App can read them, so it lends a token.
       #
-      # Scoped with `insteadOf` per repository rather than a checkout `token:`
-      # override on purpose: an override would also persist the App's
-      # credentials for THIS repo's remote, and the App is Contents:read — the
-      # `git push` of the release branch below would then be refused. Leaving
-      # checkout on the default token keeps that push working.
+      # The token goes on the submodule REMOTES, and this repo's own checkout
+      # is left on the default token. An `actions/checkout` `token:` override
+      # would also persist the App's credentials for this repo's remote, and
+      # the App is Contents:read — the `git push` of the release branch below
+      # would then be refused, moving the failure one step later.
       - uses: actions/create-github-app-token@v2
         id: natives_token
         with:
@@ -77,21 +78,30 @@ jobs:
             RevnixSDK-iOS
             RevnixSDK-Android
 
-      - name: Lend the App's token to the native submodule remotes
-        env:
-          NATIVES_TOKEN: ${{ steps.natives_token.outputs.token }}
-        run: |
-          for REPO in RevnixSDK-iOS RevnixSDK-Android; do
-            git config --global \
-              "url.https://x-access-token:${NATIVES_TOKEN}@github.com/Oth-tech/${REPO}.git.insteadOf" \
-              "https://github.com/Oth-tech/${REPO}.git"
-          done
-
+      # Deliberately NOT `submodules: recursive`: checkout would fetch them
+      # with its own token and fail. They are fetched in the next step instead.
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 0
-          submodules: recursive
+
+      # `checkout` writes an `http.https://github.com/.extraheader` carrying the
+      # default token, and git sends that Authorization header on every
+      # github.com request. GitHub honours the header over any credentials in
+      # the URL, so putting the App's token in the submodule URL is silently
+      # ignored — that was tried first and failed exactly this way.
+      #
+      # So every submodule command REPLACES the header with one carrying the
+      # App's token, for that command only. The header in .git/config is left
+      # alone, so the release push below still authenticates as this repo.
+      - name: Check out the native submodules with the App's token
+        env:
+          NATIVES_TOKEN: ${{ steps.natives_token.outputs.token }}
+        run: |
+          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$NATIVES_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$AUTH"
+          git -c http."https://github.com/".extraheader="$AUTH" \
+            submodule update --init --recursive
 
       - uses: actions/setup-node@v4
         with:
@@ -150,10 +160,15 @@ jobs:
       - name: Move the native submodules to upstream main
         if: steps.pending.outputs.pending != 'true'
         id: natives
+        env:
+          NATIVES_TOKEN: ${{ steps.natives_token.outputs.token }}
         run: |
           IOS_BEFORE=$(git -C ios/Revnix rev-parse HEAD)
           ANDROID_BEFORE=$(git -C android/revnix-kotlin rev-parse HEAD)
-          git submodule update --remote --init --recursive
+          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$NATIVES_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$AUTH"
+          git -c http."https://github.com/".extraheader="$AUTH" \
+            submodule update --remote --init --recursive
           IOS_AFTER=$(git -C ios/Revnix rev-parse HEAD)
           ANDROID_AFTER=$(git -C android/revnix-kotlin rev-parse HEAD)
           NOTE=""
@@ -228,6 +243,7 @@ jobs:
         env:
           NEXT: ${{ steps.version.outputs.next }}
           SUMMARY: ${{ steps.version.outputs.summary }}
+          NATIVES_TOKEN: ${{ steps.natives_token.outputs.token }}
         run: |
           BRANCH="release/v$NEXT"
           git config user.name "github-actions[bot]"
@@ -250,7 +266,10 @@ jobs:
           fi
           git fetch origin main
           git checkout -q origin/main
-          git submodule update --init --recursive
+          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$NATIVES_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$AUTH"
+          git -c http."https://github.com/".extraheader="$AUTH" \
+            submodule update --init --recursive
           LANDED=$(node -p "require('./package.json').version")
           if [ "$LANDED" != "$NEXT" ]; then
             echo "::error::main carries $LANDED after the merge, expected $NEXT."
