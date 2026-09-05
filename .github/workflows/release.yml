@@ -1,0 +1,315 @@
+# Release revnix-capacitor to npm.
+#
+# Dispatched by revnix-app's "Release SDKs" workflow on every merge to its
+# main (after revnix-react has released), and runnable by hand. One run = one
+# version. Beyond what the revnix-sdk release does, this one:
+#
+#   * moves the native submodules (ios/Revnix → RevnixSDK-iOS,
+#     android/revnix-kotlin → RevnixSDK-Android) to their upstream main, and
+#     records the move in the changelog. The npm tarball ships those sources
+#     (see `files` in package.json), so the checkout is recursive throughout;
+#   * follows revnix-react: the web implementation delegates to it, so the
+#     dependency is bumped to the version the caller just released (or the
+#     latest on npm when run by hand);
+#   * rebuilds, which regenerates the docgen blocks in README.md.
+#
+# The version always moves, even when nothing changed — lockstep with
+# revnix-app releases by decision (2026-09-05). Publishing uses npm trusted
+# publishing (OIDC); an NPM_TOKEN secret, if present, is a break-glass override.
+
+name: Release
+run-name: "Release ${{ inputs.run_key || format('manual-{0}', github.run_id) }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump. auto reads the Unreleased section of CHANGELOG.md."
+        type: choice
+        options: [auto, major, minor, patch]
+        default: auto
+      revnix_react_version:
+        description: "revnix-react version to depend on. Empty = latest on npm."
+        type: string
+        default: ""
+      app_sha:
+        description: "revnix-app commit this release rides on (recorded in the changelog)."
+        type: string
+        default: ""
+      run_key:
+        description: "Caller's correlation key; becomes the run name so the caller can find this run."
+        type: string
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: recursive
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Update npm
+        run: npm install -g npm@latest && npm --version
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and test main before touching it
+        run: npm test
+
+      # A previous run may have merged the bump and then failed to publish
+      # (trusted publisher not configured, npm outage). main is then one
+      # version ahead of npm with no tag. Publish that version instead of
+      # bumping past it and leaving a hole in the sequence.
+      - name: Is main already ahead of npm?
+        id: pending
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          CURRENT=$(node -p "require('./package.json').version")
+          if npm view "$NAME@$CURRENT" version 2>/dev/null | grep -q .; then
+            echo "$NAME@$CURRENT is on npm; a normal release follows."
+            echo "pending=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::$NAME@$CURRENT is on main but not on npm — publishing it instead of bumping."
+            node scripts/release.mjs --notes-for "$CURRENT" --notes-out "$RUNNER_TEMP/release-notes.md"
+            {
+              echo "pending=true"
+              echo "version=$CURRENT"
+              echo "sha=$(git rev-parse HEAD)"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Has the code moved since the last release?
+        if: steps.pending.outputs.pending != 'true'
+        id: changed
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          if git rev-parse -q --verify "refs/tags/v$CURRENT" >/dev/null; then
+            if git diff --quiet "v$CURRENT" HEAD -- . ':(exclude)CHANGELOG.md'; then
+              CHANGED=false
+            else
+              CHANGED=true
+            fi
+            echo "Since v$CURRENT: changed=$CHANGED"
+          else
+            CHANGED=true
+            echo "No tag v$CURRENT to compare against; treating the tree as changed."
+          fi
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+      - name: Move the native submodules to upstream main
+        if: steps.pending.outputs.pending != 'true'
+        id: natives
+        run: |
+          IOS_BEFORE=$(git -C ios/Revnix rev-parse HEAD)
+          ANDROID_BEFORE=$(git -C android/revnix-kotlin rev-parse HEAD)
+          git submodule update --remote --init --recursive
+          IOS_AFTER=$(git -C ios/Revnix rev-parse HEAD)
+          ANDROID_AFTER=$(git -C android/revnix-kotlin rev-parse HEAD)
+          NOTE=""
+          if [ "$IOS_BEFORE" != "$IOS_AFTER" ] || [ "$ANDROID_BEFORE" != "$ANDROID_AFTER" ]; then
+            NOTE="Native SDKs: RevnixSDK-iOS ${IOS_BEFORE:0:7} → ${IOS_AFTER:0:7}, RevnixSDK-Android ${ANDROID_BEFORE:0:7} → ${ANDROID_AFTER:0:7}."
+            echo "$NOTE"
+          else
+            echo "Submodule pins already at upstream main."
+          fi
+          echo "note=$NOTE" >> "$GITHUB_OUTPUT"
+          echo "ios=$IOS_AFTER" >> "$GITHUB_OUTPUT"
+          echo "android=$ANDROID_AFTER" >> "$GITHUB_OUTPUT"
+
+      - name: Follow revnix-react
+        if: steps.pending.outputs.pending != 'true'
+        id: react
+        env:
+          WANT: ${{ inputs.revnix_react_version }}
+        run: |
+          if [ -z "$WANT" ]; then WANT=$(npm view revnix-react version); fi
+          HAVE=$(node -p "require('./package.json').dependencies['revnix-react']")
+          NOTE=""
+          if [ "$HAVE" != "^$WANT" ]; then
+            npm install "revnix-react@^$WANT" --save
+            NOTE="Web: revnix-react $HAVE → ^$WANT."
+            echo "$NOTE"
+          else
+            echo "revnix-react already at $HAVE."
+          fi
+          echo "note=$NOTE" >> "$GITHUB_OUTPUT"
+
+      # docgen rewrites README.md as part of the build; the release carries it.
+      - name: Rebuild and test with the moved pieces
+        if: steps.pending.outputs.pending != 'true'
+        run: npm test
+
+      - name: Decide and apply the next version
+        if: steps.pending.outputs.pending != 'true'
+        id: version
+        env:
+          NATIVES_NOTE: ${{ steps.natives.outputs.note }}
+          REACT_NOTE: ${{ steps.react.outputs.note }}
+        run: |
+          ARGS=()
+          [ -n "$NATIVES_NOTE" ] && ARGS+=(--note "$NATIVES_NOTE")
+          [ -n "$REACT_NOTE" ] && ARGS+=(--note "$REACT_NOTE")
+          node scripts/release.mjs \
+            --bump "${{ inputs.bump }}" \
+            --app-sha "${{ inputs.app_sha }}" \
+            --changed "${{ steps.changed.outputs.changed }}" \
+            --notes-out "$RUNNER_TEMP/release-notes.md" \
+            "${ARGS[@]}"
+
+      - name: Refuse to reuse a version that already exists
+        if: steps.pending.outputs.pending != 'true'
+        env:
+          NEXT: ${{ steps.version.outputs.next }}
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          if npm view "$NAME@$NEXT" version >/dev/null 2>&1; then
+            echo "::error::$NAME@$NEXT is already on npm. Bump package.json past it and re-run."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/v$NEXT" >/dev/null 2>&1; then
+            echo "::error::Tag v$NEXT already exists. Bump package.json past it and re-run."
+            exit 1
+          fi
+
+      - name: Land the bump through a pull request (main takes merge commits only)
+        if: steps.pending.outputs.pending != 'true'
+        id: land
+        env:
+          NEXT: ${{ steps.version.outputs.next }}
+          SUMMARY: ${{ steps.version.outputs.summary }}
+        run: |
+          BRANCH="release/v$NEXT"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          git commit -m "Release $NEXT" -m "$SUMMARY"
+          git push origin "$BRANCH"
+          PR_URL=$(gh pr create --base main --head "$BRANCH" \
+            --title "Release $NEXT" --body-file "$RUNNER_TEMP/release-notes.md")
+          echo "Opened $PR_URL"
+          MERGED=""
+          for i in 1 2 3 4 5 6; do
+            if gh pr merge "$PR_URL" --merge --delete-branch; then MERGED=1; break; fi
+            sleep 10
+          done
+          if [ -z "$MERGED" ]; then
+            echo "::error::Could not merge $PR_URL — nothing was published."
+            exit 1
+          fi
+          git fetch origin main
+          git checkout -q origin/main
+          git submodule update --init --recursive
+          LANDED=$(node -p "require('./package.json').version")
+          if [ "$LANDED" != "$NEXT" ]; then
+            echo "::error::main carries $LANDED after the merge, expected $NEXT."
+            exit 1
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "pr=$PR_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve what to publish
+        id: pub
+        env:
+          PENDING: ${{ steps.pending.outputs.pending }}
+        run: |
+          if [ "$PENDING" = "true" ]; then
+            echo "next=${{ steps.pending.outputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ steps.pending.outputs.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "next=${{ steps.version.outputs.next }}" >> "$GITHUB_OUTPUT"
+            echo "sha=${{ steps.land.outputs.sha }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The tarball must carry the native sources the podspec and gradle
+      # build compile; a checkout without submodules would publish an empty
+      # native half and every consumer's build would break.
+      - name: Check the tarball carries the native SDKs
+        run: |
+          npm ci
+          LIST=$(npm pack --dry-run --json | node -e '
+            let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+              console.log(JSON.parse(s)[0].files.map((f) => f.path).join("\n"));
+            });')
+          for NEED in "ios/Revnix/Sources/Revnix/" "android/revnix-kotlin/revnix-core/src/main/" "android/revnix-kotlin/revnix-android/src/main/" "dist/plugin.cjs.js"; do
+            if ! echo "$LIST" | grep -q "^$NEED"; then
+              echo "::error::npm pack would not include $NEED — refusing to publish."
+              exit 1
+            fi
+          done
+          echo "$LIST" | wc -l | xargs echo "files in tarball:"
+
+      - name: Publish to npm
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > ~/.npmrc
+            echo "Publishing with NPM_TOKEN."
+          else
+            echo "Publishing with trusted publishing (OIDC)."
+          fi
+          npm publish --access public
+
+      # The podspec fetches `:tag => version`, so the tag is part of the
+      # release, not decoration.
+      - name: Tag and release
+        env:
+          NEXT: ${{ steps.pub.outputs.next }}
+          SHA: ${{ steps.pub.outputs.sha }}
+        run: |
+          NAME=$(node -p "require('./package.json').name")
+          git tag -a "v$NEXT" -m "$NAME $NEXT" "$SHA"
+          git push origin "v$NEXT"
+          git tag -a "$NEXT" -m "$NAME $NEXT" "$SHA"
+          git push origin "$NEXT"
+          gh release create "v$NEXT" --target "$SHA" --title "$NAME $NEXT" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: Summary
+        if: always()
+        env:
+          CURRENT: ${{ steps.version.outputs.current }}
+          NEXT: ${{ steps.pub.outputs.next }}
+          LEVEL: ${{ steps.version.outputs.level }}
+          LOCKSTEP: ${{ steps.version.outputs.lockstep }}
+          PR: ${{ steps.land.outputs.pr }}
+          PENDING: ${{ steps.pending.outputs.pending }}
+          APP_SHA: ${{ inputs.app_sha }}
+          IOS: ${{ steps.natives.outputs.ios }}
+          ANDROID: ${{ steps.natives.outputs.android }}
+        run: |
+          {
+            echo "## revnix-capacitor ${NEXT:-?}"
+            echo ""
+            if [ "$PENDING" = "true" ]; then
+              echo "- published the version already on main (a previous run merged it but did not publish)"
+            else
+              echo "- from ${CURRENT:-?} (${LEVEL:-?} bump, lockstep=${LOCKSTEP:-?})"
+            fi
+            [ -n "$PR" ] && echo "- release PR: $PR"
+            [ -n "$IOS" ] && echo "- natives: RevnixSDK-iOS ${IOS:0:7}, RevnixSDK-Android ${ANDROID:0:7}"
+            [ -n "$APP_SHA" ] && echo "- revnix-app: $APP_SHA"
+            echo "- status: ${{ job.status }}"
+          } >> "$GITHUB_STEP_SUMMARY"
