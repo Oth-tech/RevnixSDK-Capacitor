@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- **`logPaywallEvent` — the six paywall interactions** (`selected`,
+  `purchase_started`, `purchase_abandoned`, `purchase_failed`, `restore`,
+  `error`), i.e. what the customer did BETWEEN the display and the close. The
+  paywall view sends all but the purchase outcome, which only your app can see.
+  All six are pure history: over-reporting skews a report, it never grants or
+  revokes access. Pass the `viewId` `logPaywallShown` resolved with, so the
+  whole life of one impression threads together.
+- **The selected plan is drawn from the design.** Every block carries
+  `selectedStyle` and `visibility`, so a plan card can change its fill, border
+  and text when its package is the selected one, and a block can be drawn only
+  while selected (a filled radio dot) or only while not.
 - **iOS starts the StoreKit 2 observer in `configure`.** Renewals, Ask to
   Buy approvals, refunds, and purchases made on another device now reach
   Revnix on Capacitor iOS, as they already did on Flutter and Android. The
@@ -10,6 +23,16 @@
   simply returns `duplicate: true`. A second `configure` retires the
   previous observer (Android now retires its Play Billing connector the same
   way).
+- `renderRevnixPaywall(container, options)` (REV-226) — framework-free DOM
+  paywall renderer, ported 1:1 from revnix-react's `RevnixPaywall` (all nine
+  template layouts, dark/light modes, anchor-price currency guard, one
+  `paywall.viewed` report per render-mount via the plugin). Returns a handle
+  with `update(partialOptions)` / `destroy()`. Designed (block) paywalls,
+  backgrounds, plan selection, close, and gradient fills followed in the same
+  renderer.
+
+### Changed
+
 - The native SDKs are git submodules (`ios/Revnix` → RevnixSDK-iOS,
   `android/revnix-kotlin` → RevnixSDK-Android) instead of vendored copies,
   which had already drifted from upstream. Clone with
@@ -18,11 +41,6 @@
   `paywallJson`), so a designed paywall from a newer dashboard reaches JS
   untouched.
 - **iOS deployment target is 16.0** (was 15.0), revnix-swift's floor.
-- `renderRevnixPaywall(container, options)` (REV-226) — framework-free DOM
-  paywall renderer, ported 1:1 from revnix-react's `RevnixPaywall` (all nine
-  template layouts, dark/light modes, anchor-price currency guard, one
-  `paywall.viewed` report per render-mount via the plugin). Returns a handle
-  with `update(partialOptions)` / `destroy()`
 
 ## 0.2.0
 
