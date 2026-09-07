@@ -62,6 +62,9 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
       },
       reportInstalls: true,
       installMetadata: { platform: 'web' },
+      // REV-268: revnix-react detects what a browser exposes (platform, OS
+      // version, locale); the app's overrides win.
+      device: options.device,
     });
     // Launch chore, same as the native sides: drain anything a previous
     // session failed to deliver. Idempotent server-side.

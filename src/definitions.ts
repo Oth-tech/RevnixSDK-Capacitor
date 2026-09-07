@@ -18,6 +18,38 @@ export interface ConfigureOptions {
   entitlementsTtlMs?: number;
   /** Snapshots older than this serve as all-inactive. Default 14 days. */
   offlineMaxCacheAgeMs?: number;
+  /**
+   * REV-268: overrides for the device facts sent with every placement
+   * resolve, so targeting rules ("US storefront", "app version at least 3")
+   * can be evaluated on the request that serves the paywall. The native SDKs
+   * detect platform, OS version, app version, locale, currency, model and the
+   * sandbox flag themselves (the web build detects what a browser exposes);
+   * pass only what you know better. Stored on the customer as reserved
+   * `device.*` attributes, visible in the dashboard.
+   */
+  device?: DeviceFacts;
+}
+
+/** REV-268: the app-suppliable half of the device attribute contract. Every
+ *  field is optional; the server normalizes case, locale separators and
+ *  alpha-3 storefronts. */
+export interface DeviceFacts {
+  /** "ios", "android", "web", … — lowercase family name. */
+  platform?: string;
+  /** e.g. "18.1". */
+  osVersion?: string;
+  /** The host app's version, e.g. "1.2.10". */
+  appVersion?: string;
+  /** "en-US" or "en_US". */
+  locale?: string;
+  /** ISO 4217, e.g. "USD". */
+  currency?: string;
+  /** Store country — alpha-2 ("US") or alpha-3 ("USA"). */
+  storefront?: string;
+  /** Hardware model identifier. */
+  model?: string;
+  /** True in a sandbox / debug build. */
+  sandbox?: boolean;
 }
 
 export interface EntitlementSource {

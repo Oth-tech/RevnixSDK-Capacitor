@@ -464,13 +464,32 @@ removeAllListeners() => Promise<void>
 
 #### ConfigureOptions
 
-| Prop                       | Type                | Description                                                                                                                                                                                                         |
-| -------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`apiKey`**               | <code>string</code> | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary; identify/alias are server-proxied by design and not part of this plugin. |
-| **`baseUrl`**              | <code>string</code> | e.g. `https://your-deployment.convex.site`                                                                                                                                                                          |
-| **`timeoutMs`**            | <code>number</code> | Per-request timeout in ms. Default 10 000.                                                                                                                                                                          |
-| **`entitlementsTtlMs`**    | <code>number</code> | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                              |
-| **`offlineMaxCacheAgeMs`** | <code>number</code> | Snapshots older than this serve as all-inactive. Default 14 days.                                                                                                                                                   |
+| Prop                       | Type                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`apiKey`**               | <code>string</code>                                 | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary; identify/alias are server-proxied by design and not part of this plugin.                                                                                                                                                                                                                                                                      |
+| **`baseUrl`**              | <code>string</code>                                 | e.g. `https://your-deployment.convex.site`                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **`timeoutMs`**            | <code>number</code>                                 | Per-request timeout in ms. Default 10 000.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **`entitlementsTtlMs`**    | <code>number</code>                                 | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **`offlineMaxCacheAgeMs`** | <code>number</code>                                 | Snapshots older than this serve as all-inactive. Default 14 days.                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **`device`**               | <code><a href="#devicefacts">DeviceFacts</a></code> | REV-268: overrides for the device facts sent with every placement resolve, so targeting rules ("US storefront", "app version at least 3") can be evaluated on the request that serves the paywall. The native SDKs detect platform, OS version, app version, locale, currency, model and the sandbox flag themselves (the web build detects what a browser exposes); pass only what you know better. Stored on the customer as reserved `device.*` attributes, visible in the dashboard. |
+
+
+#### DeviceFacts
+
+REV-268: the app-suppliable half of the device attribute contract. Every
+field is optional; the server normalizes case, locale separators and
+alpha-3 storefronts.
+
+| Prop             | Type                 | Description                                         |
+| ---------------- | -------------------- | --------------------------------------------------- |
+| **`platform`**   | <code>string</code>  | "ios", "android", "web", … — lowercase family name. |
+| **`osVersion`**  | <code>string</code>  | e.g. "18.1".                                        |
+| **`appVersion`** | <code>string</code>  | The host app's version, e.g. "1.2.10".              |
+| **`locale`**     | <code>string</code>  | "en-US" or "en_US".                                 |
+| **`currency`**   | <code>string</code>  | ISO 4217, e.g. "USD".                               |
+| **`storefront`** | <code>string</code>  | Store country — alpha-2 ("US") or alpha-3 ("USA").  |
+| **`model`**      | <code>string</code>  | Hardware model identifier.                          |
+| **`sandbox`**    | <code>boolean</code> | True in a sandbox / debug build.                    |
 
 
 #### CustomerEntitlements
