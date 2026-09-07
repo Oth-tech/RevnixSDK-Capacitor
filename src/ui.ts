@@ -24,6 +24,7 @@
 import type { PaywallConfig, RevnixPaywallEvent } from './definitions';
 import { asBlockDoc, renderBlockDoc } from './blocks';
 import type { PaywallBlockDoc } from './blocks';
+import { detectLocale, localizeBlockDoc } from './locale';
 
 /** One purchasable row. `priceLabel` must come from the store (localized). */
 export interface RevnixPaywallPackage {
@@ -125,6 +126,13 @@ export interface RevnixPaywallOptions {
    *  natively, so a `fill` never needs this; it exists so the one class of
    *  value CSS discards silently is not lost without a word. */
   onDiagnostic?: (message: string) => void;
+  /** REV-271: which language a designed paywall draws its copy in. Omitted,
+   *  the device's own is detected; a host that already knows its in-app
+   *  language passes it so the paywall follows the app rather than the OS. A
+   *  paywall with no translations ignores this, and any string the chosen
+   *  language does not translate falls back to the authored copy — never to
+   *  blank. */
+  locale?: string;
   theme?: Partial<RevnixPaywallTheme>;
   /** When given, the paywall reports one paywall.viewed per render-mount
    *  (REV-094) — the analytics funnel's "Paywall displayed" stage. The
@@ -485,7 +493,13 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     // Precedence: a designed paywall (`config.blocks`) wins over the classic
     // layouts below, which stay the fallback for every paywall published
     // before the block builder — so anything already live renders unchanged.
-    const blockDoc = asBlockDoc(config.blocks);
+    // REV-271: the language overlay is applied ONCE, here, so every draw path
+    // below reads plain strings and none can forget to localize one. A
+    // paywall with no translations returns itself.
+    const parsedDoc = asBlockDoc(config.blocks);
+    const blockDoc = parsedDoc
+      ? localizeBlockDoc(parsedDoc, this.options.locale ?? detectLocale())
+      : parsedDoc;
     if (blockDoc) {
       // renderBlocks falls back to the classic layout when the tree throws, so
       // it owns the decision — it is the only place that knows which renderer

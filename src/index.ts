@@ -47,4 +47,12 @@ export {
   resolveSelectedContext,
   resolveTags,
 } from './blocks';
+// REV-271: localization. `renderRevnixPaywall` applies the overlay itself;
+// these are for a host that renders a block document by hand.
+export {
+  detectLocale,
+  localeChain,
+  localizeBlockDoc,
+  normalizeLocale,
+} from './locale';
 export { Revnix };
