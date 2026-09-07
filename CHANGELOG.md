@@ -11,8 +11,8 @@
   first launch and the dashboard shows them on the customer as `device.*`
   attributes. The native SDKs detect them; the web build detects what a
   browser exposes. `configure({ device: { … } })` overrides individual keys.
-  Requires revnix-react 1.2.0 and the revnix-swift / revnix-kotlin 0.3.0
-  submodules. (REV-268)
+  Requires the revnix-react release that carries the contract, and the
+  native submodules moved to it. (REV-268)
 
 ## 1.1.0 (2026-09-05)
 
