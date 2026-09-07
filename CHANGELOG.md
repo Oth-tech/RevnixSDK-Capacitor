@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+
+- **Device attribute contract.** Every `resolvePlacement` now carries the
+  device facts — platform, OS version, app version, locale, currency,
+  storefront, model, install date, SDK version, sandbox, first open — as
+  `X-Revnix-Device`, so targeting rules and audiences can use them from the
+  first launch and the dashboard shows them on the customer as `device.*`
+  attributes. The native SDKs detect them; the web build detects what a
+  browser exposes. `configure({ device: { … } })` overrides individual keys.
+  Requires the revnix-react release that carries the contract, and the
+  native submodules moved to it. (REV-268)
+
 ## 1.1.0 (2026-09-05)
 
 ### Added

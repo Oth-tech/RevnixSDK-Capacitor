@@ -14,6 +14,8 @@ import com.revnix.RevnixConfig
 import com.revnix.RevnixError
 import com.revnix.RevnixPaywallEvent
 import com.revnix.RevnixStore
+import com.revnix.DeviceFacts
+import com.revnix.android.AndroidDeviceFacts
 import com.revnix.android.AndroidStorage
 import com.revnix.android.PlayBillingConnector
 import kotlin.time.Duration.Companion.milliseconds
@@ -77,6 +79,10 @@ class RevnixPlugin : Plugin() {
                         },
                     )
                 },
+                // REV-268: revnix-kotlin detects the device facts; JS may
+                // override the ones the app knows better.
+                device = AndroidDeviceFacts.detect(context)
+                    .overriddenBy(deviceOverrides(call.getObject("device"))),
             )
         )
         client = created
@@ -89,6 +95,22 @@ class RevnixPlugin : Plugin() {
             created.registerInstall(platform = "android-capacitor", appVersion = null)
         }
         call.resolve()
+    }
+
+    /** JS-supplied device fact overrides (REV-268); null when none. */
+    private fun deviceOverrides(obj: JSObject?): DeviceFacts? {
+        if (obj == null) return null
+        fun str(key: String) = if (obj.has(key)) obj.getString(key) else null
+        return DeviceFacts(
+            platform = str("platform"),
+            osVersion = str("osVersion"),
+            appVersion = str("appVersion"),
+            locale = str("locale"),
+            currency = str("currency"),
+            storefront = str("storefront"),
+            model = str("model"),
+            sandbox = if (obj.has("sandbox")) obj.getBoolean("sandbox") else null,
+        )
     }
 
     private fun requireClient(call: PluginCall): RevnixClient? {
