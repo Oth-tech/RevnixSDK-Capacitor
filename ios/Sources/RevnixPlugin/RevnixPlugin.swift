@@ -35,6 +35,8 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
+        // REV-272: the one implicit moment no SDK can see for itself.
+        CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
     ]
 
     private var client: RevnixClient?
@@ -84,10 +86,39 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             },
             // REV-268: revnix-swift detects the device facts; JS may override
             // the ones the app knows better.
-            device: Self.deviceFacts(overrides: call.getObject("device"))
+            device: Self.deviceFacts(overrides: call.getObject("device")),
+            // REV-272: JS opts in explicitly — the plugin always has a handler
+            // to give (the event emitter), so "is there a handler" cannot be
+            // the signal the way it is in revnix-react.
+            onImplicitPaywall: { [weak self] trigger in
+                // retainUntilConsumed: the launch moments fire during
+                // configure(), which a JS app typically calls BEFORE
+                // addListener resolves. Dropping those would lose the paywall
+                // after the ledger row was already written — the one failure
+                // here that looks like the server misbehaving.
+                self?.notifyListeners(
+                    "implicitPaywall",
+                    data: [
+                        "placement": trigger.placement.rawValue,
+                        "resolution": Self.js(trigger.resolution),
+                    ],
+                    retainUntilConsumed: true)
+            },
+            implicitPlacements: call.getBool("implicitPlacements") ?? false,
+            sessionTimeout: (call.getDouble("sessionTimeoutMs")
+                ?? revnixDefaultSessionTimeout * 1000) / 1000.0
         )
         configOverride?(&config)
         let created = RevnixClient(config)
+        // REV-272: retire the previous client BEFORE replacing it. Its
+        // didBecomeActive observer lives on NotificationCenter and outlives the
+        // reference, so a re-configure without this leaves two clients watching
+        // the foreground — every return would then mint two session_start
+        // triggers and emit two implicitPaywall events. Same reasoning as the
+        // StoreKit observer retired just below, different resource.
+        if let previous = client {
+            Task { await previous.stop() }
+        }
         client = created
         observer?.cancel()
         observer = startObserver(created)
@@ -239,6 +270,21 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 Self.reject(call, error)
             }
         }
+    }
+
+    /// REV-272: the URL that opened the app. Capacitor delivers it to the
+    /// host's own `appUrlOpen` listener, so the host forwards it here.
+    @objc func handleDeepLink(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let raw = call.getString("url"), let url = URL(string: raw) else {
+            call.reject("url is required", "invalid", nil, ["isRetryable": false])
+            return
+        }
+        // Resolved immediately: this runs inside the host's appUrlOpen handler,
+        // right before it routes, and the trigger is two network round trips.
+        // Every Revnix telemetry call is a beacon, and this is one too.
+        Task { await client.handleDeepLink(url) }
+        call.resolve()
     }
 
     @objc func registerInstall(_ call: CAPPluginCall) {

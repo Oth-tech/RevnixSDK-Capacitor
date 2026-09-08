@@ -1,5 +1,6 @@
 package com.revnix.capacitor
 
+import android.app.Application
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -15,7 +16,9 @@ import com.revnix.RevnixError
 import com.revnix.RevnixPaywallEvent
 import com.revnix.RevnixStore
 import com.revnix.DeviceFacts
+import com.revnix.REVNIX_DEFAULT_SESSION_TIMEOUT_MS
 import com.revnix.android.AndroidDeviceFacts
+import com.revnix.android.AndroidLifecycle
 import com.revnix.android.AndroidStorage
 import com.revnix.android.PlayBillingConnector
 import kotlin.time.Duration.Companion.milliseconds
@@ -83,8 +86,38 @@ class RevnixPlugin : Plugin() {
                 // override the ones the app knows better.
                 device = AndroidDeviceFacts.detect(context)
                     .overriddenBy(deviceOverrides(call.getObject("device"))),
+                // REV-272: JS opts in explicitly — the plugin always has a
+                // handler to give (the event emitter), so "is there a handler"
+                // cannot be the signal the way it is in revnix-react.
+                onImplicitPaywall = { trigger ->
+                    // retainUntilConsumed: the launch moments fire during
+                    // configure(), which a JS app typically calls BEFORE
+                    // addListener resolves. Dropping those would lose the
+                    // paywall after the ledger row was already written — the
+                    // one failure here that looks like the server misbehaving.
+                    notifyListeners(
+                        "implicitPaywall",
+                        JSObject().apply {
+                            put("placement", trigger.placement.key)
+                            put("resolution", js(trigger.resolution))
+                        },
+                        true,
+                    )
+                },
+                implicitPlacements = call.getBoolean("implicitPlacements") ?: false,
+                lifecycle = (context.applicationContext as? Application)
+                    ?.let { AndroidLifecycle(it) },
+                sessionTimeoutMs = call.getDouble("sessionTimeoutMs")?.toLong()
+                    ?: REVNIX_DEFAULT_SESSION_TIMEOUT_MS,
             )
         )
+        // REV-272: retire the previous client BEFORE replacing it. Its
+        // AndroidLifecycle callbacks are registered on the Application and
+        // outlive the plugin instance, so a re-configure without this leaves
+        // two clients watching the foreground — every return would then mint
+        // two session_start triggers and emit two implicitPaywall events.
+        // Same reasoning as the billing connector below, different resource.
+        client?.close()
         client = created
         // Owns connection, purchase replay, acknowledgement, and the queue drain.
         // A re-configure retires the previous connector first, or two would
@@ -226,6 +259,28 @@ class RevnixPlugin : Plugin() {
     }
 
     // MARK: - Placements & telemetry
+
+    /**
+     * REV-272: the URL that opened the app. Capacitor delivers it to the
+     * host's own `appUrlOpen` listener, so the host forwards it here.
+     */
+    @PluginMethod
+    fun handleDeepLink(call: PluginCall) {
+        // Refused rather than silently accepted when unconfigured — a deep
+        // link handler wired before configure() would otherwise look like it
+        // worked and never fire a single moment. Matches every other method.
+        val active = requireClient(call) ?: return
+        val url = call.getString("url")
+        if (url == null) {
+            call.reject("url is required", "invalid")
+            return
+        }
+        // Resolved immediately: this runs inside the host's appUrlOpen handler,
+        // right before it routes, and the trigger is two network round trips.
+        // Every Revnix telemetry call is a beacon, and this is one too.
+        scope.launch { active.handleDeepLink(url) }
+        call.resolve()
+    }
 
     @PluginMethod
     fun resolvePlacement(call: PluginCall) {
