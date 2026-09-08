@@ -127,7 +127,9 @@ handle.destroy(); // remove from the DOM when dismissed
 * [`logPaywallClosed(...)`](#logpaywallclosed)
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`setAttributes(...)`](#setattributes)
+* [`handleDeepLink(...)`](#handledeeplink)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
+* [`addListener('implicitPaywall', ...)`](#addlistenerimplicitpaywall-)
 * [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -371,6 +373,11 @@ Fire-and-forget paywall dismissal (REV-252) — the other half of a
 display's life. Idempotent per view id, exactly like the impression.
 Pass the id `logPaywallShown` resolved with for this display.
 
+A close is a DECLINE. Do not report one for a display that ended in a
+purchase — with implicit placements on, a close is also the
+`paywall_decline` moment, and a win-back offer seconds after a successful
+purchase is the one thing an operator never means.
+
 | Param         | Type                                                                        |
 | ------------- | --------------------------------------------------------------------------- |
 | **`options`** | <code>{ viewId: string; placementKey?: string; paywallId?: string; }</code> |
@@ -432,6 +439,27 @@ a device.
 --------------------
 
 
+### handleDeepLink(...)
+
+```typescript
+handleDeepLink(options: { url: string; }) => Promise<void>
+```
+
+REV-272: hand the SDK the URL that opened your app, from wherever you
+already receive it (Capacitor's own `appUrlOpen` listener, your router).
+
+This is the one implicit moment the SDK cannot see for itself — the URL
+reaches the host's entry point, and an SDK intercepting it would be
+fighting the app's routing. Does nothing unless `deeplink_open` is
+configured in the dashboard.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ url: string; }</code> |
+
+--------------------
+
+
 ### addListener('diagnostic', ...)
 
 ```typescript
@@ -444,6 +472,37 @@ Background failures the SDK swallowed (queue drains, telemetry).
 | ------------------ | -------------------------------------------------------------------------------------- |
 | **`eventName`**    | <code>'diagnostic'</code>                                                              |
 | **`listenerFunc`** | <code>(diagnostic: <a href="#revnixdiagnostic">RevnixDiagnostic</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('implicitPaywall', ...)
+
+```typescript
+addListener(eventName: 'implicitPaywall', listenerFunc: (trigger: ImplicitTrigger) => void) => Promise<PluginListenerHandle>
+```
+
+REV-272: one of the six implicit moments resolved to a paywall. Present
+it however your app presents paywalls; the plugin deliberately does not
+present for you, because it does not own your routing and a paywall
+thrown over a splash view is worse than no paywall.
+
+Requires `implicitPlacements: true` in configure().
+
+⚠️ Pass `trigger.resolution.placementKey` to `logPaywallShown` for the
+display you present. That is what tells the SDK this display came FROM an
+implicit trigger, and it is the only thing that stops a `paywall_decline`
+paywall from firing `paywall_decline` again when the customer dismisses
+it — a loop with no way out but force-quitting. The server refuses to
+serve back the very same paywall as a backstop, but it cannot see a rule
+that points at a DIFFERENT paywall which points back.
+
+| Param              | Type                                                                              |
+| ------------------ | --------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'implicitPaywall'</code>                                                    |
+| **`listenerFunc`** | <code>(trigger: <a href="#implicittrigger">ImplicitTrigger</a>) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -472,6 +531,8 @@ removeAllListeners() => Promise<void>
 | **`entitlementsTtlMs`**    | <code>number</code>                                 | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **`offlineMaxCacheAgeMs`** | <code>number</code>                                 | Snapshots older than this serve as all-inactive. Default 14 days.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **`device`**               | <code><a href="#devicefacts">DeviceFacts</a></code> | REV-268: overrides for the device facts sent with every placement resolve, so targeting rules ("US storefront", "app version at least 3") can be evaluated on the request that serves the paywall. The native SDKs detect platform, OS version, app version, locale, currency, model and the sandbox flag themselves (the web build detects what a browser exposes); pass only what you know better. Stored on the customer as reserved `device.*` attributes, visible in the dashboard. |
+| **`implicitPlacements`**   | <code>boolean</code>                                | REV-272: turn on implicit placements — the six moments the SDK reports on its own (`app_install`, `app_launch`, `session_start`, `deeplink_open`, `paywall_decline`, `transaction_abandon`). With this on, the SDK asks `GET /v1/config` once and then fires only for the moments this app has configured in the dashboard, emitting each one that resolves to a paywall as an `implicitPaywall` event. Off by default: without a listener there is nothing to do with the answer.       |
+| **`sessionTimeoutMs`**     | <code>number</code>                                 | REV-272: how long the app must have been backgrounded for the return to count as a new session rather than an app switch. Default 30 minutes.                                                                                                                                                                                                                                                                                                                                            |
 
 
 #### DeviceFacts
@@ -690,6 +751,19 @@ A background failure the SDK swallowed (queue drains, telemetry beacons).
 | **`message`** | <code>string</code> |
 
 
+#### ImplicitTrigger
+
+REV-272: one implicit moment that resolved to a paywall. Only ever
+delivered WITH a paywall — a moment the server answered with none (nothing
+attached, or the same paywall the customer is leaving) is reported and
+then dropped, since there is nothing to present.
+
+| Prop             | Type                                                                | Description                                                           |
+| ---------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| **`placement`**  | <code><a href="#implicitplacement">ImplicitPlacement</a></code>     | Which of the six fired.                                               |
+| **`resolution`** | <code><a href="#placementresolution">PlacementResolution</a></code> | The resolution, exactly as `resolvePlacement` would have returned it. |
+
+
 ### Type Aliases
 
 
@@ -715,5 +789,14 @@ close or purchase that ended it. The server turns each into the ledger type
 Construct a type with a set of properties K of type T
 
 <code>{ [P in K]: T; }</code>
+
+
+#### ImplicitPlacement
+
+REV-272: which of the six implicit moments fired. Lowercase throughout —
+`deeplink_open`, not Superwall's `deepLink_open`, because a placement key
+must match `^[a-z0-9][a-z0-9._-]{0,63}$` server-side.
+
+<code>'app_install' | 'app_launch' | 'session_start' | 'deeplink_open' | 'paywall_decline' | 'transaction_abandon'</code>
 
 </docgen-api>

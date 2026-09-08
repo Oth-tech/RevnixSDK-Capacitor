@@ -65,6 +65,28 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
       // REV-268: revnix-react detects what a browser exposes (platform, OS
       // version, locale); the app's overrides win.
       device: options.device,
+      // REV-272: implicit placements. revnix-react turns them on when a
+      // handler is present, so the web build gates on the OPTION instead —
+      // this plugin always has a handler to give (the event emitter), and
+      // without the option every Capacitor web app would start firing.
+      implicitPlacements: options.implicitPlacements ?? false,
+      ...(options.sessionTimeoutMs !== undefined
+        ? { sessionTimeoutMs: options.sessionTimeoutMs }
+        : {}),
+      onImplicitPaywall: (trigger) => {
+        // retainUntilConsumed: the launch moments fire during configure(),
+        // which an app typically calls BEFORE addListener resolves. Dropping
+        // those would lose the paywall after the ledger row was already
+        // written — the one failure here that looks like a server bug.
+        this.notifyListeners(
+          'implicitPaywall',
+          {
+            placement: trigger.placement,
+            resolution: trigger.resolution,
+          },
+          true,
+        );
+      },
     });
     // Launch chore, same as the native sides: drain anything a previous
     // session failed to deliver. Idempotent server-side.
@@ -114,6 +136,13 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   async pendingPurchaseCount(): Promise<{ count: number }> {
     // The queue is internal to revnix-react on web; no inspection API yet.
     return { count: 0 };
+  }
+
+  async handleDeepLink(options: { url: string }): Promise<void> {
+    // REV-272: `visibilitychange` covers foreground, but nothing tells the SDK
+    // a link opened the app — Capacitor delivers that to the host's own
+    // appUrlOpen listener.
+    this.require().handleDeepLink(options.url);
   }
 
   async resolvePlacement(options: { placementKey: string }): Promise<PlacementResolution> {
