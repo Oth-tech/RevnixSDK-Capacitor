@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.1.1 (2026-09-12)
+
 ### Added
 
 - **Device attribute contract.** Every `resolvePlacement` now carries the
@@ -13,6 +15,10 @@
   browser exposes. `configure({ device: { … } })` overrides individual keys.
   Requires the revnix-react release that carries the contract, and the
   native submodules moved to it. (REV-268)
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS ca7b282 → f7d57f5, RevnixSDK-Android 5761f2c → d194a9c.
 
 ## 1.1.0 (2026-09-05)
 
