@@ -37,6 +37,10 @@ It will compile the TypeScript code from `src/` into ESM JavaScript in `dist/esm
 
 Then, Rollup will bundle the code into a single file at `dist/plugin.js`. This file is used in apps without bundlers by including it as a script in `index.html`.
 
+#### `npm test`
+
+Build, then run the tests in `test/` against the compiled output in `dist/esm/` with Node's test runner. The iOS bridge's XCTest suite runs separately with `npm run verify:ios:test` (iPhone 17 Pro simulator).
+
 #### `npm run verify`
 
 Build and validate the web and native projects.
