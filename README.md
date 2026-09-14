@@ -798,9 +798,7 @@ close or purchase that ended it. The server turns each into the ledger type
 
 Construct a type with a set of properties K of type T
 
-<code>{
- [P in K]: T;
- }</code>
+<code>{ [P in K]: T; }</code>
 
 
 #### ImplicitPlacement
