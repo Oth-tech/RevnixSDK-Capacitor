@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **On-device QR paywall preview.** `PREVIEW_PLACEMENT_KEY` (`revnix_preview`)
+  and `PlacementResolution.preview` identify a paywall opened from the
+  dashboard's QR preview via `handleDeepLink`; `renderRevnixPaywall` disables
+  purchases and view/close analytics for that placement. The native side of
+  this (recognising the deep link, fetching the preview, suppressing its own
+  analytics) lands with a later native submodule pin bump.
+
 ## 1.1.1 (2026-09-12)
 
 ### Added

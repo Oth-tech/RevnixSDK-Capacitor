@@ -108,6 +108,14 @@ handle.update({ loading: true }); // spinner in the CTA while purchasing
 handle.destroy(); // remove from the DOM when dismissed
 ```
 
+The dashboard's QR preview opens the app on the `deeplink_open` moment with
+`trigger.resolution.placementKey === PREVIEW_PLACEMENT_KEY` (on web
+`resolution.preview` is also set) — detect it in your `implicitPaywall` listener the same way.
+`renderRevnixPaywall` disables purchases for that key on its own (a tap alerts
+"Purchases are disabled in preview." instead of calling `onPurchase`) and
+skips its view/close analytics; a custom UI presenting the design itself must
+check `PREVIEW_PLACEMENT_KEY` the same way before wiring a purchase handler.
+
 ## API
 
 <docgen-index>
@@ -623,6 +631,7 @@ alpha-3 storefronts.
 | **`offering`**     | <code><a href="#placementoffering">PlacementOffering</a></code>             |                                                                                                                                                                                |
 | **`paywall`**      | <code><a href="#placementpaywall">PlacementPaywall</a></code>               | Remote paywall render contract: your app renders it in v1. Absent when the placement has no paywall attached (the wire sends null; native bridges omit the key).               |
 | **`experiment`**   | <code><a href="#placementexperiment">PlacementExperiment</a> \| null</code> | Sticky experiment assignment for this customer; `null` when no running experiment covers the placement (older servers omit the key, and every bridge normalizes that to null). |
+| **`preview`**      | <code>boolean</code>                                                        | Set only on a dashboard QR preview.                                                                                                                                            |
 
 
 #### PlacementOffering
@@ -789,7 +798,9 @@ close or purchase that ended it. The server turns each into the ledger type
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
+<code>{
+ [P in K]: T;
+ }</code>
 
 
 #### ImplicitPlacement
