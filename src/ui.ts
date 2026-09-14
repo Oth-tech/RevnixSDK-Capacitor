@@ -82,6 +82,10 @@ export const LIGHT_PAYWALL_THEME: RevnixPaywallTheme = {
 
 const DEFAULT_ACCENT = '#6478ff';
 
+/** The placementKey a dashboard QR preview resolves to; purchases and
+ *  view/close analytics are disabled for this key. */
+export const PREVIEW_PLACEMENT_KEY = 'revnix_preview';
+
 // Currency symbols the anchor-price guard recognizes (majors; a symbol-less
 // anchor can't be judged and renders as entered).
 const CURRENCY_SYMBOL = /[$€£¥₹₩₽₺₫₪฿₴₦₱]/;
@@ -218,7 +222,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     // a genuine new display; `update()` re-renders are not. The report is a
     // fire-and-forget beacon — a failed delivery never breaks the paywall.
     const { client, placementKey, paywallId, disableViewTracking } = options;
-    if (client && !disableViewTracking) {
+    if (client && !disableViewTracking && placementKey !== PREVIEW_PLACEMENT_KEY) {
       this.viewReport = Promise.resolve(client.logPaywallShown({ placementKey, paywallId }))
         .then((result) => {
           // A client that predates REV-252 resolves with void; the close then
@@ -331,6 +335,10 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
   /** Every CTA path routes through here, so the start report can never be
    *  wired on one render path and forgotten on the other. */
   private purchase(packageId: string): void {
+    if (this.options.placementKey === PREVIEW_PLACEMENT_KEY) {
+      this.root.ownerDocument.defaultView?.alert('Purchases are disabled in preview.');
+      return;
+    }
     this.purchaseAttempts += 1;
     this.report('purchase_started', {
       productId: this.productIdFor(packageId),

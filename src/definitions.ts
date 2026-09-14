@@ -255,6 +255,8 @@ export interface PlacementResolution {
    *  experiment covers the placement (older servers omit the key, and every
    *  bridge normalizes that to null). */
   experiment: PlacementExperiment | null;
+  /** Set only on a dashboard QR preview. */
+  preview?: boolean;
 }
 
 /** A background failure the SDK swallowed (queue drains, telemetry beacons). */
