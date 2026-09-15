@@ -408,8 +408,11 @@ export interface RevnixPlugin {
     attributes: Record<string, string | number | null>;
   }): Promise<void>;
 
-  /** REV-272: hand the SDK the URL that opened your app, from wherever you
-   *  already receive it (Capacitor's own `appUrlOpen` listener, your router).
+  /** REV-272: hand the SDK the URL that opened your app, forwarded from your
+   *  `appUrlOpen` listener — it also carries the URL that launched a closed
+   *  app, on both platforms. Don't also pass `App.getLaunchUrl()`, that is
+   *  the same open and would count twice; the launch URL goes to the first
+   *  `appUrlOpen` listener only.
    *
    *  This is the one implicit moment the SDK cannot see for itself — the URL
    *  reaches the host's entry point, and an SDK intercepting it would be
