@@ -116,6 +116,22 @@ The dashboard's QR preview opens the app on the `deeplink_open` moment with
 skips its view/close analytics; a custom UI presenting the design itself must
 check `PREVIEW_PLACEMENT_KEY` the same way before wiring a purchase handler.
 
+## Deep links
+
+```ts
+import { App } from '@capacitor/app';
+
+App.addListener('appUrlOpen', ({ url }) => Revnix.handleDeepLink({ url }));
+```
+
+`appUrlOpen` also delivers the URL that launched a closed app, on both
+platforms: `@capacitor/app` replays the launch link and retains it until a
+listener attaches. Do not also pass `App.getLaunchUrl()` — that is the same
+open, and it would count twice. The retained launch URL is handed to the
+first `appUrlOpen` listener only, so call `handleDeepLink` from the listener
+your router already uses (or register this one first), not from a second
+listener added later.
+
 ## API
 
 <docgen-index>
@@ -454,8 +470,11 @@ a device.
 handleDeepLink(options: { url: string; }) => Promise<void>
 ```
 
-REV-272: hand the SDK the URL that opened your app, from wherever you
-already receive it (Capacitor's own `appUrlOpen` listener, your router).
+REV-272: hand the SDK the URL that opened your app, forwarded from your
+`appUrlOpen` listener — it also carries the URL that launched a closed
+app, on both platforms. Don't also pass `App.getLaunchUrl()`, that is
+the same open and would count twice; the launch URL goes to the first
+`appUrlOpen` listener only.
 
 This is the one implicit moment the SDK cannot see for itself — the URL
 reaches the host's entry point, and an SDK intercepting it would be
