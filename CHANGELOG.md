@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Deferred deep links.** The `deferredDeepLink` listener event fires at
+  most once per install with the link a customer clicked before installing —
+  `exact` on Android (from `handleInstallReferrer`), `probabilistic` on iOS
+  (matched by the server on install). `handleInstallReferrer({ referrer })`
+  hands the raw Play Install Referrer string to the native Android SDK; a
+  no-op on iOS and web. (REV-299)
+
 ## 1.1.2 (2026-09-14)
 
 ### Added

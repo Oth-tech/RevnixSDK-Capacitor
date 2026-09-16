@@ -132,6 +132,34 @@ first `appUrlOpen` listener only, so call `handleDeepLink` from the listener
 your router already uses (or register this one first), not from a second
 listener added later.
 
+## Deferred deep links
+
+The link a customer clicked before installing the app. Fires at most once per
+install, on both iOS and Android — attach the listener before `configure()`
+finishes, or an event that already fired is retained until you do:
+
+```ts
+Revnix.addListener('deferredDeepLink', ({ url, match }) => {
+  // match is "exact" (Android, from the install referrer) or "probabilistic"
+  // (iOS, matched by the server on install); route like any other deep link.
+});
+```
+
+Android also needs the raw install referrer string, read with an
+install-referrer plugin of your choice (this package does not add one) and
+handed to the SDK after `configure()`:
+
+```ts
+await Revnix.configure({ apiKey, baseUrl });
+await Revnix.handleInstallReferrer({ referrer });
+```
+
+`handleInstallReferrer` resolves as a no-op on iOS and web — iOS has no
+install referrer, and matches on install instead. On Android it rejects if
+`configure()` hasn't run yet, so a host reading the referrer during its own
+boot must await/catch it rather than fire it before `configure()` — otherwise
+the referrer, and the deferred link it carries, is lost for good.
+
 ## API
 
 <docgen-index>
@@ -153,8 +181,10 @@ listener added later.
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
+* [`handleInstallReferrer(...)`](#handleinstallreferrer)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`addListener('implicitPaywall', ...)`](#addlistenerimplicitpaywall-)
+* [`addListener('deferredDeepLink', ...)`](#addlistenerdeferreddeeplink-)
 * [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -488,6 +518,31 @@ configured in the dashboard.
 --------------------
 
 
+### handleInstallReferrer(...)
+
+```typescript
+handleInstallReferrer(options: { referrer: string; }) => Promise<void>
+```
+
+REV-299: Android only — hand the SDK the raw Play Install Referrer
+string, read by your own install-referrer plugin (this package does not
+add one) and passed here verbatim. Resolves as a no-op on iOS and web:
+iOS has no install referrer, and a Capacitor web app has no store
+install to defer a link from.
+
+On Android, `configure()` must run first — like every other Android
+method, this rejects if it hasn't. A host that reads the referrer
+during its own boot must await/catch this call (rather than fire it
+before `configure()`), or the referrer — and the deferred link it
+carries — is lost for good.
+
+| Param         | Type                               |
+| ------------- | ---------------------------------- |
+| **`options`** | <code>{ referrer: string; }</code> |
+
+--------------------
+
+
 ### addListener('diagnostic', ...)
 
 ```typescript
@@ -531,6 +586,29 @@ that points at a DIFFERENT paywall which points back.
 | ------------------ | --------------------------------------------------------------------------------- |
 | **`eventName`**    | <code>'implicitPaywall'</code>                                                    |
 | **`listenerFunc`** | <code>(trigger: <a href="#implicittrigger">ImplicitTrigger</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('deferredDeepLink', ...)
+
+```typescript
+addListener(eventName: 'deferredDeepLink', listenerFunc: (link: DeferredDeepLink) => void) => Promise<PluginListenerHandle>
+```
+
+REV-299: a deferred deep link the server matched to this install — the
+link a customer clicked before installing. Fires at most once per
+install. Android: `exact`, matched from the referrer passed to
+`handleInstallReferrer`. iOS: `probabilistic`, matched by the server on
+install (iOS has no install referrer, but does fire this). An event
+that fires before this listener is attached is retained until it is.
+
+| Param              | Type                                                                             |
+| ------------------ | -------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'deferredDeepLink'</code>                                                  |
+| **`listenerFunc`** | <code>(link: <a href="#deferreddeeplink">DeferredDeepLink</a>) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -793,6 +871,21 @@ then dropped, since there is nothing to present.
 | **`resolution`** | <code><a href="#placementresolution">PlacementResolution</a></code> | The resolution, exactly as `resolvePlacement` would have returned it. |
 
 
+#### DeferredDeepLink
+
+REV-299: a deferred deep link the server attributed to this install — the
+link a customer clicked before installing. Fires at most once per install.
+Android: `exact`, matched from the referrer passed to
+`handleInstallReferrer`. iOS: `probabilistic`, matched by the server on
+install (iOS has no install referrer). An event that fires before the
+listener is attached is retained until it is.
+
+| Prop        | Type                                                                    |
+| ----------- | ----------------------------------------------------------------------- |
+| **`url`**   | <code>string</code>                                                     |
+| **`match`** | <code><a href="#deferreddeeplinkmatch">DeferredDeepLinkMatch</a></code> |
+
+
 ### Type Aliases
 
 
@@ -827,5 +920,12 @@ REV-272: which of the six implicit moments fired. Lowercase throughout —
 must match `^[a-z0-9][a-z0-9._-]{0,63}$` server-side.
 
 <code>'app_install' | 'app_launch' | 'session_start' | 'deeplink_open' | 'paywall_decline' | 'transaction_abandon'</code>
+
+
+#### DeferredDeepLinkMatch
+
+REV-299: how the server matched a deferred deep link to this install.
+
+<code>'exact' | 'probabilistic'</code>
 
 </docgen-api>

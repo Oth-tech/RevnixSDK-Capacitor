@@ -1,5 +1,6 @@
 package com.getcapacitor
 
+import com.revnix.DeferredDeepLinkMatch
 import com.revnix.MemoryStorage
 import com.revnix.PlacementResolution
 import com.revnix.RevnixClient
@@ -70,6 +71,12 @@ class ExampleUnitTest {
         val url = sent!!.url
         assertEquals("cust one", url.queryParameter("customer"))
         assertTrue(url.toString(), url.toString().endsWith("/offering?customer=cust%20one"))
+    }
+
+    @Test
+    fun `deferred deep link match names lowercase to the wire values`() {
+        assertEquals("exact", DeferredDeepLinkMatch.EXACT.name.lowercase())
+        assertEquals("probabilistic", DeferredDeepLinkMatch.PROBABILISTIC.name.lowercase())
     }
 
     @Test

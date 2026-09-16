@@ -37,6 +37,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "handleInstallReferrer", returnType: CAPPluginReturnPromise),
     ]
 
     private var client: RevnixClient?
@@ -105,6 +106,15 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                     retainUntilConsumed: true)
             },
             implicitPlacements: call.getBool("implicitPlacements") ?? false,
+            // REV-299: retainUntilConsumed for the same reason as
+            // implicitPaywall above — this fires during configure(), which a
+            // JS app typically calls BEFORE addListener resolves.
+            onDeferredDeepLink: { [weak self] url, match in
+                self?.notifyListeners(
+                    "deferredDeepLink",
+                    data: ["url": url.absoluteString, "match": match.rawValue],
+                    retainUntilConsumed: true)
+            },
             sessionTimeout: (call.getDouble("sessionTimeoutMs")
                 ?? revnixDefaultSessionTimeout * 1000) / 1000.0
         )
@@ -284,6 +294,10 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         // right before it routes, and the trigger is two network round trips.
         // Every Revnix telemetry call is a beacon, and this is one too.
         Task { await client.handleDeepLink(url) }
+        call.resolve()
+    }
+
+    @objc func handleInstallReferrer(_ call: CAPPluginCall) {
         call.resolve()
     }
 
