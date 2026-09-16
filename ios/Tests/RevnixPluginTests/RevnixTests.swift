@@ -48,6 +48,11 @@ class RevnixTests: XCTestCase {
         }
     }
 
+    func testDeferredDeepLinkMatchRawValues() {
+        XCTAssertEqual(DeferredDeepLinkMatch.exact.rawValue, "exact")
+        XCTAssertEqual(DeferredDeepLinkMatch.probabilistic.rawValue, "probabilistic")
+    }
+
     func testMemoryStorage() {
         let storage = MemoryStorage()
         storage.set("k", "v")

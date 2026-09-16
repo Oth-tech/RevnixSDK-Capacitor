@@ -68,6 +68,20 @@ export interface ImplicitTrigger {
   resolution: PlacementResolution;
 }
 
+/** REV-299: how the server matched a deferred deep link to this install. */
+export type DeferredDeepLinkMatch = 'exact' | 'probabilistic';
+
+/** REV-299: a deferred deep link the server attributed to this install — the
+ *  link a customer clicked before installing. Fires at most once per install.
+ *  Android: `exact`, matched from the referrer passed to
+ *  `handleInstallReferrer`. iOS: `probabilistic`, matched by the server on
+ *  install (iOS has no install referrer). An event that fires before the
+ *  listener is attached is retained until it is. */
+export interface DeferredDeepLink {
+  url: string;
+  match: DeferredDeepLinkMatch;
+}
+
 /** REV-268: the app-suppliable half of the device attribute contract. Every
  *  field is optional; the server normalizes case, locale separators and
  *  alpha-3 storefronts. */
@@ -420,6 +434,19 @@ export interface RevnixPlugin {
    *  configured in the dashboard. */
   handleDeepLink(options: { url: string }): Promise<void>;
 
+  /** REV-299: Android only — hand the SDK the raw Play Install Referrer
+   *  string, read by your own install-referrer plugin (this package does not
+   *  add one) and passed here verbatim. Resolves as a no-op on iOS and web:
+   *  iOS has no install referrer, and a Capacitor web app has no store
+   *  install to defer a link from.
+   *
+   *  On Android, `configure()` must run first — like every other Android
+   *  method, this rejects if it hasn't. A host that reads the referrer
+   *  during its own boot must await/catch this call (rather than fire it
+   *  before `configure()`), or the referrer — and the deferred link it
+   *  carries — is lost for good. */
+  handleInstallReferrer(options: { referrer: string }): Promise<void>;
+
   /** Background failures the SDK swallowed (queue drains, telemetry). */
   addListener(
     eventName: 'diagnostic',
@@ -443,6 +470,17 @@ export interface RevnixPlugin {
   addListener(
     eventName: 'implicitPaywall',
     listenerFunc: (trigger: ImplicitTrigger) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /** REV-299: a deferred deep link the server matched to this install — the
+   *  link a customer clicked before installing. Fires at most once per
+   *  install. Android: `exact`, matched from the referrer passed to
+   *  `handleInstallReferrer`. iOS: `probabilistic`, matched by the server on
+   *  install (iOS has no install referrer, but does fire this). An event
+   *  that fires before this listener is attached is retained until it is. */
+  addListener(
+    eventName: 'deferredDeepLink',
+    listenerFunc: (link: DeferredDeepLink) => void,
   ): Promise<PluginListenerHandle>;
 
   removeAllListeners(): Promise<void>;

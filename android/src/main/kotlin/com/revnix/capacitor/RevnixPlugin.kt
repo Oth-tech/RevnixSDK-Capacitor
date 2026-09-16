@@ -109,6 +109,19 @@ class RevnixPlugin : Plugin() {
                     ?.let { AndroidLifecycle(it) },
                 sessionTimeoutMs = call.getDouble("sessionTimeoutMs")?.toLong()
                     ?: REVNIX_DEFAULT_SESSION_TIMEOUT_MS,
+                // retainUntilConsumed: fires during configure(), which a JS
+                // app typically calls BEFORE addListener resolves. Same
+                // reasoning as onImplicitPaywall above.
+                onDeferredDeepLink = { url, match ->
+                    notifyListeners(
+                        "deferredDeepLink",
+                        JSObject().apply {
+                            put("url", url)
+                            put("match", match.name.lowercase())
+                        },
+                        true,
+                    )
+                },
             )
         )
         // REV-272: retire the previous client BEFORE replacing it. Its
@@ -279,6 +292,18 @@ class RevnixPlugin : Plugin() {
         // right before it routes, and the trigger is two network round trips.
         // Every Revnix telemetry call is a beacon, and this is one too.
         scope.launch { active.handleDeepLink(url) }
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun handleInstallReferrer(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val referrer = call.getString("referrer")
+        if (referrer == null) {
+            call.reject("referrer is required", "invalid")
+            return
+        }
+        active.handleInstallReferrer(referrer, platform = "android-capacitor")
         call.resolve()
     }
 

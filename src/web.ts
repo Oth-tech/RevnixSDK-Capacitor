@@ -145,6 +145,8 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     this.require().handleDeepLink(options.url);
   }
 
+  async handleInstallReferrer(): Promise<void> {}
+
   async resolvePlacement(options: { placementKey: string }): Promise<PlacementResolution> {
     // Wire-identical shapes (this plugin's PlacementPaywall/PaywallConfig
     // mirror revnix-react's); revnix-react uses null where this plugin's
