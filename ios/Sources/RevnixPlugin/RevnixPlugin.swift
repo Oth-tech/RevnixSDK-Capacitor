@@ -37,6 +37,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "resolveDeepLink", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "handleInstallReferrer", returnType: CAPPluginReturnPromise),
     ]
 
@@ -295,6 +296,20 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         // Every Revnix telemetry call is a beacon, and this is one too.
         Task { await client.handleDeepLink(url) }
         call.resolve()
+    }
+
+    /// REV-299: unwrap a link an email service provider wrapped in its own
+    /// click-tracking domain.
+    @objc func resolveDeepLink(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let raw = call.getString("url"), let url = URL(string: raw) else {
+            call.reject("url is required", "invalid", nil, ["isRetryable": false])
+            return
+        }
+        Task {
+            let resolved = await client.resolveDeepLink(url)
+            call.resolve(["url": resolved.absoluteString])
+        }
     }
 
     @objc func handleInstallReferrer(_ call: CAPPluginCall) {

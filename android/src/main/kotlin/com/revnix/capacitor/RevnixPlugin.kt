@@ -295,6 +295,21 @@ class RevnixPlugin : Plugin() {
         call.resolve()
     }
 
+    /**
+     * REV-299: unwrap a link an email service provider wrapped in its own
+     * click-tracking domain.
+     */
+    @PluginMethod
+    fun resolveDeepLink(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val url = call.getString("url")
+        if (url == null) {
+            call.reject("url is required", "invalid")
+            return
+        }
+        scope.launch { call.resolve(JSObject().put("url", active.resolveDeepLink(url))) }
+    }
+
     @PluginMethod
     fun handleInstallReferrer(call: PluginCall) {
         val active = requireClient(call) ?: return

@@ -145,6 +145,26 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     this.require().handleDeepLink(options.url);
   }
 
+  // ponytail: revnix-react 1.1.2 lacks resolveDeepLink; switch to this.require().resolveDeepLink() once it ships.
+  async resolveDeepLink(options: { url: string }): Promise<{ url: string }> {
+    const credentials = this.credentials;
+    if (!credentials) throw new Error('Revnix.configure() must be called first');
+    const { url } = options;
+    if (!url) return { url };
+    if (url.length > 1024 || !/^https?:\/\//i.test(url)) return { url };
+    try {
+      const res = await fetch(
+        `${credentials.baseUrl.replace(/\/$/, '')}/v1/links/resolve?url=${encodeURIComponent(url)}`,
+        { headers: { Authorization: `Bearer ${credentials.apiKey}` } },
+      );
+      if (!res.ok) return { url };
+      const body = await res.json();
+      return typeof body?.url === 'string' && body.url ? { url: body.url } : { url };
+    } catch {
+      return { url };
+    }
+  }
+
   async handleInstallReferrer(): Promise<void> {}
 
   async resolvePlacement(options: { placementKey: string }): Promise<PlacementResolution> {
