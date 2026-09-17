@@ -38,6 +38,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "resolveDeepLink", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getLastDeepLink", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "handleInstallReferrer", returnType: CAPPluginReturnPromise),
     ]
 
@@ -309,6 +310,22 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         Task {
             let resolved = await client.resolveDeepLink(url)
             call.resolve(["url": resolved.absoluteString])
+        }
+    }
+
+    @objc func getLastDeepLink(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        Task {
+            if let lastDeepLink = await client.lastDeepLink() {
+                call.resolve([
+                    "lastDeepLink": [
+                        "url": lastDeepLink.url.absoluteString,
+                        "receivedAt": Int(lastDeepLink.receivedAt.timeIntervalSince1970 * 1000),
+                    ],
+                ])
+            } else {
+                call.resolve(["lastDeepLink": NSNull()])
+            }
         }
     }
 

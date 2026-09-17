@@ -82,6 +82,15 @@ export interface DeferredDeepLink {
   match: DeferredDeepLinkMatch;
 }
 
+/** The last deep link the native SDK recorded: a link passed to
+ *  `handleDeepLink`, or a delivered deferred deep link. See
+ *  `RevnixPlugin.getLastDeepLink`. */
+export interface LastDeepLink {
+  url: string;
+  /** Epoch milliseconds. */
+  receivedAt: number;
+}
+
 /** REV-268: the app-suppliable half of the device attribute contract. Every
  *  field is optional; the server normalizes case, locale separators and
  *  alpha-3 storefronts. */
@@ -445,6 +454,16 @@ export interface RevnixPlugin {
    *  result may still be an http(s) URL when the chain could not be
    *  unwrapped; check its scheme before routing on it. */
   resolveDeepLink(options: { url: string }): Promise<{ url: string }>;
+
+  /** The most recent deep link the native SDK recorded: a URL you passed to
+   *  `handleDeepLink`, or a deferred deep link delivered to the
+   *  `deferredDeepLink` listener, whichever came last. Nothing else is
+   *  recorded, so the URL that launched a closed app counts only once your
+   *  `appUrlOpen` listener has forwarded it to `handleDeepLink`. Dashboard
+   *  preview links are never recorded. Resolves `null` before any link has
+   *  been recorded, and always `null` on web for now. On iOS and Android it
+   *  rejects before `configure()`. */
+  getLastDeepLink(): Promise<{ lastDeepLink: LastDeepLink | null }>;
 
   /** REV-299: Android only — hand the SDK the raw Play Install Referrer
    *  string, read by your own install-referrer plugin (this package does not
