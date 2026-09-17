@@ -132,6 +132,21 @@ first `appUrlOpen` listener only, so call `handleDeepLink` from the listener
 your router already uses (or register this one first), not from a second
 listener added later.
 
+Some links reach your app wrapped in an email service provider's own
+click-tracking domain, e.g. `https://click.mailchimp.com/track/abc`.
+`resolveDeepLink` unwraps it back to the app link it redirects to so you can
+route on the real thing:
+
+```ts
+const { url } = await Revnix.resolveDeepLink({ url: wrappedUrl });
+Revnix.handleDeepLink({ url });
+```
+
+It rejects before `configure()`; otherwise it never rejects. A link that cannot
+be resolved comes back unchanged, so the
+result may still be an http(s) URL when the chain could not be unwrapped.
+Check its scheme before routing on it.
+
 ## Deferred deep links
 
 The link a customer clicked before installing the app. Fires at most once per
@@ -181,6 +196,7 @@ the referrer, and the deferred link it carries, is lost for good.
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
+* [`resolveDeepLink(...)`](#resolvedeeplink)
 * [`handleInstallReferrer(...)`](#handleinstallreferrer)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`addListener('implicitPaywall', ...)`](#addlistenerimplicitpaywall-)
@@ -514,6 +530,32 @@ configured in the dashboard.
 | Param         | Type                          |
 | ------------- | ----------------------------- |
 | **`options`** | <code>{ url: string; }</code> |
+
+--------------------
+
+
+### resolveDeepLink(...)
+
+```typescript
+resolveDeepLink(options: { url: string; }) => Promise<{ url: string; }>
+```
+
+REV-299: unwrap a link an email service provider (Mailchimp, SendGrid,
+…) wrapped in its own click-tracking domain, e.g.
+`https://click.mailchimp.com/track/abc` back to the
+`com.yourapp://promo?utm_source=email` it redirects to. Route the
+result the same way you would any other deep link, typically by handing
+it to `handleDeepLink`. Rejects before `configure()`; otherwise never
+rejects: a link that cannot be resolved
+(network failure, not a tracked domain) comes back unchanged, so the
+result may still be an http(s) URL when the chain could not be
+unwrapped; check its scheme before routing on it.
+
+| Param         | Type                          |
+| ------------- | ----------------------------- |
+| **`options`** | <code>{ url: string; }</code> |
+
+**Returns:** <code>Promise&lt;{ url: string; }&gt;</code>
 
 --------------------
 

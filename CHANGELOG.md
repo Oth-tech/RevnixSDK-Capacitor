@@ -10,6 +10,9 @@
   (matched by the server on install). `handleInstallReferrer({ referrer })`
   hands the raw Play Install Referrer string to the native Android SDK; a
   no-op on iOS and web. (REV-299)
+- **`resolveDeepLink`.** Unwrap a link an email service provider wrapped in
+  its own click-tracking domain back to the app deep link it redirects to.
+  Never rejects; a link that cannot be resolved comes back unchanged. (REV-299)
 
 ## 1.1.2 (2026-09-14)
 
