@@ -434,6 +434,18 @@ export interface RevnixPlugin {
    *  configured in the dashboard. */
   handleDeepLink(options: { url: string }): Promise<void>;
 
+  /** REV-299: unwrap a link an email service provider (Mailchimp, SendGrid,
+   *  …) wrapped in its own click-tracking domain, e.g.
+   *  `https://click.mailchimp.com/track/abc` back to the
+   *  `com.yourapp://promo?utm_source=email` it redirects to. Route the
+   *  result the same way you would any other deep link, typically by handing
+   *  it to `handleDeepLink`. Rejects before `configure()`; otherwise never
+   *  rejects: a link that cannot be resolved
+   *  (network failure, not a tracked domain) comes back unchanged, so the
+   *  result may still be an http(s) URL when the chain could not be
+   *  unwrapped; check its scheme before routing on it. */
+  resolveDeepLink(options: { url: string }): Promise<{ url: string }>;
+
   /** REV-299: Android only — hand the SDK the raw Play Install Referrer
    *  string, read by your own install-referrer plugin (this package does not
    *  add one) and passed here verbatim. Resolves as a no-op on iOS and web:
