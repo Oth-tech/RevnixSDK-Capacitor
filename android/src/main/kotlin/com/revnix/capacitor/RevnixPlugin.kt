@@ -311,6 +311,22 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getLastDeepLink(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val lastDeepLink = active.getLastDeepLink()
+        val out = JSObject()
+        if (lastDeepLink == null) {
+            out.put("lastDeepLink", JSONObject.NULL)
+        } else {
+            out.put(
+                "lastDeepLink",
+                JSObject().put("url", lastDeepLink.url).put("receivedAt", lastDeepLink.receivedAt),
+            )
+        }
+        call.resolve(out)
+    }
+
+    @PluginMethod
     fun handleInstallReferrer(call: PluginCall) {
         val active = requireClient(call) ?: return
         val referrer = call.getString("referrer")

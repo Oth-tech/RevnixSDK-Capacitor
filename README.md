@@ -197,6 +197,7 @@ the referrer, and the deferred link it carries, is lost for good.
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
 * [`resolveDeepLink(...)`](#resolvedeeplink)
+* [`getLastDeepLink()`](#getlastdeeplink)
 * [`handleInstallReferrer(...)`](#handleinstallreferrer)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`addListener('implicitPaywall', ...)`](#addlistenerimplicitpaywall-)
@@ -560,6 +561,26 @@ unwrapped; check its scheme before routing on it.
 --------------------
 
 
+### getLastDeepLink()
+
+```typescript
+getLastDeepLink() => Promise<{ lastDeepLink: LastDeepLink | null; }>
+```
+
+The most recent deep link the native SDK recorded: a URL you passed to
+`handleDeepLink`, or a deferred deep link delivered to the
+`deferredDeepLink` listener, whichever came last. Nothing else is
+recorded, so the URL that launched a closed app counts only once your
+`appUrlOpen` listener has forwarded it to `handleDeepLink`. Dashboard
+preview links are never recorded. Resolves `null` before any link has
+been recorded, and always `null` on web for now. On iOS and Android it
+rejects before `configure()`.
+
+**Returns:** <code>Promise&lt;{ lastDeepLink: <a href="#lastdeeplink">LastDeepLink</a> | null; }&gt;</code>
+
+--------------------
+
+
 ### handleInstallReferrer(...)
 
 ```typescript
@@ -881,6 +902,18 @@ something the app needs to branch on.
 | --------------- | ------------------- |
 | **`key`**       | <code>string</code> |
 | **`variantId`** | <code>string</code> |
+
+
+#### LastDeepLink
+
+The last deep link the native SDK recorded: a link passed to
+`handleDeepLink`, or a delivered deferred deep link. See
+`RevnixPlugin.getLastDeepLink`.
+
+| Prop             | Type                | Description         |
+| ---------------- | ------------------- | ------------------- |
+| **`url`**        | <code>string</code> |                     |
+| **`receivedAt`** | <code>number</code> | Epoch milliseconds. |
 
 
 #### PluginListenerHandle

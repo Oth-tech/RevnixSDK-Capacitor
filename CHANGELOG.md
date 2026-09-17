@@ -13,6 +13,10 @@
 - **`resolveDeepLink`.** Unwrap a link an email service provider wrapped in
   its own click-tracking domain back to the app deep link it redirects to.
   Never rejects; a link that cannot be resolved comes back unchanged. (REV-299)
+- **`getLastDeepLink`.** Read back the most recent deep link the native SDK
+  recorded: a link passed to `handleDeepLink`, or a delivered deferred deep
+  link, whichever came last. Dashboard preview links are never recorded.
+  `null` before any link, and always `null` on web for now.
 
 ## 1.1.2 (2026-09-14)
 

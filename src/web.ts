@@ -4,6 +4,7 @@ import { RevnixClient } from 'revnix-react';
 import type {
   ConfigureOptions,
   CustomerEntitlements,
+  LastDeepLink,
   PlacementResolution,
   RegisterPurchaseInput,
   RegisterPurchaseResult,
@@ -163,6 +164,11 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     } catch {
       return { url };
     }
+  }
+
+  // ponytail: revnix-react 1.1.2 lacks getLastDeepLink; switch to this.require().getLastDeepLink() once it ships.
+  async getLastDeepLink(): Promise<{ lastDeepLink: LastDeepLink | null }> {
+    return { lastDeepLink: null };
   }
 
   async handleInstallReferrer(): Promise<void> {}
