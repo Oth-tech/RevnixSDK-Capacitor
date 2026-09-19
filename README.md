@@ -12,7 +12,9 @@
 > `git clone --recurse-submodules` (or `git submodule update --init` in an
 > existing checkout). To pick up a native fix, bump the submodule pin; never
 > edit the native sources from here. iOS 16.0+ (revnix-swift's floor),
-> Android minSdk 24, Capacitor 8+ (`@capacitor/core` >=8.0.0).
+> Android minSdk 24, Capacitor 8+ (`@capacitor/core` >=8.0.0). The Android
+> module compiles with `jvmToolchain(21)`, so building the Android side
+> needs JDK 21.
 
 What every platform guarantees: network-first entitlements with an offline
 cache flagged `stale`, deliberate rejections (401/403/404/409) never masked by
