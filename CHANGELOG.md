@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.2 (2026-09-19)
+
 ### Added
 
 - **Deferred deep links.** The `deferredDeepLink` listener event fires at
