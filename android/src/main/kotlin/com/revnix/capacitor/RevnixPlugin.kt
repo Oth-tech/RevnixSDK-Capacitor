@@ -21,6 +21,7 @@ import com.revnix.android.AndroidDeviceFacts
 import com.revnix.android.AndroidLifecycle
 import com.revnix.android.AndroidStorage
 import com.revnix.android.PlayBillingConnector
+import com.revnix.android.PlayInstallReferrer
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -140,6 +141,7 @@ class RevnixPlugin : Plugin() {
         scope.launch {
             created.registerInstall(platform = "android-capacitor", appVersion = null)
         }
+        PlayInstallReferrer.collect(context, created, platform = "android-capacitor")
         call.resolve()
     }
 
