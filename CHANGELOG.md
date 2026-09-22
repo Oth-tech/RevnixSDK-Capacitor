@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.2.3 (2026-09-22)
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS 7e861d6 → 09c6ca6, RevnixSDK-Android 893b3db → 91eeb99.
+- Web: revnix-react ^1.1.2 → ^1.2.3.
+
 ## 1.2.2 (2026-09-19)
 
 ### Added

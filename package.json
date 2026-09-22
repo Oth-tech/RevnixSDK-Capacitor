@@ -1,6 +1,6 @@
 {
   "name": "revnix-capacitor",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Revnix subscriptions and entitlements for Capacitor.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -86,6 +86,6 @@
     }
   },
   "dependencies": {
-    "revnix-react": "^1.1.2"
+    "revnix-react": "^1.2.3"
   }
 }
