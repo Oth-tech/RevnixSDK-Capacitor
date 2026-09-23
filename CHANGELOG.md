@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- **Automatic Play install referrer.** Android now reads the Play install
+  referrer itself during `configure()`; a host no longer needs to read it
+  with its own plugin and call `handleInstallReferrer`. That method still
+  exists and still works — calling it now just double-reports, which the
+  server absorbs harmlessly. (AT7)
+
 ## 1.2.2 (2026-09-19)
 
 ### Added
