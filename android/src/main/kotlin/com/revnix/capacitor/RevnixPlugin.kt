@@ -8,6 +8,7 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.revnix.CustomerEntitlements
 import com.revnix.PlacementResolution
+import com.revnix.RevnixAttribution
 import com.revnix.RegisterPurchaseInput
 import com.revnix.RegisterPurchaseResult
 import com.revnix.RevnixClient
@@ -122,6 +123,9 @@ class RevnixPlugin : Plugin() {
                         },
                         true,
                     )
+                },
+                onAttribution = { attribution ->
+                    notifyListeners("attribution", js(attribution), true)
                 },
             )
         )
@@ -341,6 +345,18 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getAttribution(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        scope.launch {
+            val attribution = active.getAttribution()
+            val out = JSObject()
+            if (attribution == null) out.put("attribution", JSONObject.NULL)
+            else out.put("attribution", js(attribution))
+            call.resolve(out)
+        }
+    }
+
+    @PluginMethod
     fun resolvePlacement(call: PluginCall) {
         val active = requireClient(call) ?: return
         val key = call.getString("placementKey") ?: ""
@@ -539,6 +555,22 @@ class RevnixPlugin : Plugin() {
             null, JsonNull -> put("experiment", JSONObject.NULL)
             else -> put("experiment", js(experiment))
         }
+    }
+
+    private fun js(attribution: RevnixAttribution): JSObject = JSObject().apply {
+        put("installMatch", attribution.installMatch)
+        put("attributedAt", attribution.attributedAt)
+        attribution.reattributedAt?.let { put("reattributedAt", it) }
+        attribution.linkToken?.let { put("linkToken", it) }
+        attribution.referrerSource?.let { put("referrerSource", it) }
+        attribution.matchSignals?.let {
+            put("matchSignals", org.json.JSONArray().apply { it.forEach { s -> put(s) } })
+        }
+        attribution.source?.let { put("source", it) }
+        attribution.medium?.let { put("medium", it) }
+        attribution.campaign?.let { put("campaign", it) }
+        attribution.term?.let { put("term", it) }
+        attribution.content?.let { put("content", it) }
     }
 
     /** kotlinx JsonElement → org.json, via its canonical string form. */
