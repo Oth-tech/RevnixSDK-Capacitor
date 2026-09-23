@@ -177,6 +177,20 @@ install referrer, and matches on install instead. On Android it rejects if
 boot must await/catch it rather than fire it before `configure()` — otherwise
 the referrer, and the deferred link it carries, is lost for good.
 
+iOS also registers the install with Apple's SKAdNetwork automatically, inside
+`configure()`'s `registerInstall` chore — pass `skan: false` to opt out
+entirely. To report a conversion value as the customer does things in the
+app:
+
+```ts
+await Revnix.updateSkanConversionValue({ value: 12, coarse: 'medium' });
+```
+
+`value` (0-63) and `coarse` go to Apple only, never to Revnix's servers, and
+this is a no-op on Android and web. The app's Info.plist needs
+`NSAdvertisingAttributionReportEndpoint` or Apple never delivers the
+postback.
+
 ## API
 
 <docgen-index>
@@ -193,6 +207,7 @@ the referrer, and the deferred link it carries, is lost for good.
 * [`pendingPurchaseCount()`](#pendingpurchasecount)
 * [`resolvePlacement(...)`](#resolveplacement)
 * [`registerInstall(...)`](#registerinstall)
+* [`updateSkanConversionValue(...)`](#updateskanconversionvalue)
 * [`logPaywallShown(...)`](#logpaywallshown)
 * [`logPaywallClosed(...)`](#logpaywallclosed)
 * [`logPaywallEvent(...)`](#logpaywallevent)
@@ -409,6 +424,26 @@ handled automatically by configure.)
 | Param         | Type                                                     |
 | ------------- | -------------------------------------------------------- |
 | **`options`** | <code>{ platform?: string; appVersion?: string; }</code> |
+
+--------------------
+
+
+### updateSkanConversionValue(...)
+
+```typescript
+updateSkanConversionValue(options: { value: number; coarse?: 'low' | 'medium' | 'high'; lockWindow?: boolean; }) => Promise<void>
+```
+
+iOS only; no-op on Android and web. Sets an SKAdNetwork conversion
+value — registration with Apple already happened automatically inside
+`registerInstall`. `value` is the fine-grained conversion value, 0-63;
+`coarse` is Apple's low/medium/high tier. The value goes to Apple only,
+never to Revnix. Requires `NSAdvertisingAttributionReportEndpoint` in
+the app's Info.plist, or Apple never delivers the postback.
+
+| Param         | Type                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ value: number; coarse?: 'low' \| 'medium' \| 'high'; lockWindow?: boolean; }</code> |
 
 --------------------
 
@@ -704,6 +739,7 @@ removeAllListeners() => Promise<void>
 | **`device`**               | <code><a href="#devicefacts">DeviceFacts</a></code> | REV-268: overrides for the device facts sent with every placement resolve, so targeting rules ("US storefront", "app version at least 3") can be evaluated on the request that serves the paywall. The native SDKs detect platform, OS version, app version, locale, currency, model and the sandbox flag themselves (the web build detects what a browser exposes); pass only what you know better. Stored on the customer as reserved `device.*` attributes, visible in the dashboard. |
 | **`implicitPlacements`**   | <code>boolean</code>                                | REV-272: turn on implicit placements — the six moments the SDK reports on its own (`app_install`, `app_launch`, `session_start`, `deeplink_open`, `paywall_decline`, `transaction_abandon`). With this on, the SDK asks `GET /v1/config` once and then fires only for the moments this app has configured in the dashboard, emitting each one that resolves to a paywall as an `implicitPaywall` event. Off by default: without a listener there is nothing to do with the answer.       |
 | **`sessionTimeoutMs`**     | <code>number</code>                                 | REV-272: how long the app must have been backgrounded for the return to count as a new session rather than an app switch. Default 30 minutes.                                                                                                                                                                                                                                                                                                                                            |
+| **`skan`**                 | <code>boolean</code>                                | iOS only. Default true; set false to opt out of SKAdNetwork entirely.                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 
 #### DeviceFacts

@@ -40,6 +40,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "resolveDeepLink", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getLastDeepLink", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "handleInstallReferrer", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateSkanConversionValue", returnType: CAPPluginReturnPromise),
     ]
 
     private var client: RevnixClient?
@@ -118,7 +119,8 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                     retainUntilConsumed: true)
             },
             sessionTimeout: (call.getDouble("sessionTimeoutMs")
-                ?? revnixDefaultSessionTimeout * 1000) / 1000.0
+                ?? revnixDefaultSessionTimeout * 1000) / 1000.0,
+            skan: call.getBool("skan") ?? true
         )
         configOverride?(&config)
         let created = RevnixClient(config)
@@ -339,6 +341,20 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         let appVersion = call.getString("appVersion")
         Task {
             await client.registerInstall(platform: platform, appVersion: appVersion)
+            call.resolve()
+        }
+    }
+
+    @objc func updateSkanConversionValue(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let value = call.getInt("value") else {
+            call.reject("value is required", "invalid", nil, ["isRetryable": false])
+            return
+        }
+        let coarse = call.getString("coarse").flatMap(RevnixCoarseValue.init(rawValue:))
+        let lockWindow = call.getBool("lockWindow") ?? false
+        Task {
+            await client.updateSkanConversionValue(value, coarse: coarse, lockWindow: lockWindow)
             call.resolve()
         }
     }

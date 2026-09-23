@@ -339,6 +339,11 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun updateSkanConversionValue(call: PluginCall) {
+        call.resolve()
+    }
+
+    @PluginMethod
     fun resolvePlacement(call: PluginCall) {
         val active = requireClient(call) ?: return
         val key = call.getString("placementKey") ?: ""
