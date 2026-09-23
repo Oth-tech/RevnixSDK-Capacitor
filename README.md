@@ -162,9 +162,9 @@ Revnix.addListener('deferredDeepLink', ({ url, match }) => {
 });
 ```
 
-Android also needs the raw install referrer string, read with an
-install-referrer plugin of your choice (this package does not add one) and
-handed to the SDK after `configure()`:
+On Android the SDK now reads the Play install referrer itself during
+`configure()` — you don't need to read or pass it. `handleInstallReferrer`
+still exists for a host that reads the referrer some other way:
 
 ```ts
 await Revnix.configure({ apiKey, baseUrl });
@@ -175,7 +175,9 @@ await Revnix.handleInstallReferrer({ referrer });
 install referrer, and matches on install instead. On Android it rejects if
 `configure()` hasn't run yet, so a host reading the referrer during its own
 boot must await/catch it rather than fire it before `configure()` — otherwise
-the referrer, and the deferred link it carries, is lost for good.
+the referrer, and the deferred link it carries, is lost for good. Calling it
+alongside the SDK's own automatic read just double-reports, which the server
+absorbs harmlessly.
 
 ## API
 
