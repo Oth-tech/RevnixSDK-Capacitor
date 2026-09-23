@@ -91,6 +91,29 @@ export interface LastDeepLink {
   receivedAt: number;
 }
 
+/** AT1: how the server matched this install. `organic` when nothing did. */
+export type InstallMatch = 'referrer' | 'click' | 'impression' | 'organic';
+
+/** AT1: the install-attribution verdict the server reached for this
+ *  customer. See `RevnixPlugin.getAttribution`. */
+export interface RevnixAttribution {
+  installMatch: InstallMatch;
+  /** Epoch milliseconds. */
+  attributedAt: number;
+  /** Epoch milliseconds a later match superseded the original verdict. */
+  reattributedAt?: number;
+  linkToken?: string;
+  /** AT8: Android referrer source (play/huawei/samsung/xiaomi/vivo/meta/preinstall). */
+  referrerSource?: string;
+  /** AT6: which probabilistic signals matched (iOS). */
+  matchSignals?: string[];
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  term?: string;
+  content?: string;
+}
+
 /** REV-268: the app-suppliable half of the device attribute contract. Every
  *  field is optional; the server normalizes case, locale separators and
  *  alpha-3 storefronts. */
@@ -465,6 +488,14 @@ export interface RevnixPlugin {
    *  rejects before `configure()`. */
   getLastDeepLink(): Promise<{ lastDeepLink: LastDeepLink | null }>;
 
+  /** AT1: the install-attribution verdict the native SDK holds for this
+   *  customer — the same verdict the `attribution` listener delivers, read
+   *  back on demand. `null` when no install has been recorded yet, or the
+   *  request failed. On Capacitor this costs one GET per cold start (the
+   *  native client only fetches on its own once a callback is set, and here
+   *  one always is — see the `attribution` listener). Always `null` on web. */
+  getAttribution(): Promise<{ attribution: RevnixAttribution | null }>;
+
   /** REV-299: Android only — hand the SDK the raw Play Install Referrer
    *  string, read by your own install-referrer plugin (this package does not
    *  add one) and passed here verbatim. Resolves as a no-op on iOS and web:
@@ -512,6 +543,16 @@ export interface RevnixPlugin {
   addListener(
     eventName: 'deferredDeepLink',
     listenerFunc: (link: DeferredDeepLink) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /** AT1: the install-attribution verdict, delivered the first time the
+   *  native SDK sees one after cold-start install registration, and again
+   *  whenever it changes (e.g. a late Android referrer reconciling an
+   *  earlier organic verdict) — de-duplicated natively. An event that fires
+   *  before this listener is attached is retained until it is. */
+  addListener(
+    eventName: 'attribution',
+    listenerFunc: (attribution: RevnixAttribution) => void,
   ): Promise<PluginListenerHandle>;
 
   removeAllListeners(): Promise<void>;

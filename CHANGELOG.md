@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- **Install attribution.** `getAttribution()` reads back the install-
+  attribution verdict (`referrer`/`click`/`impression`/`organic`, link and
+  UTM fields) the native SDK holds for this customer; the `attribution`
+  listener delivers it as soon as the native SDK sees a verdict after
+  cold-start install registration, and again whenever it changes.
+  Costs one GET per cold start on Capacitor; always `null` on web. (AT11)
+
 ## 1.2.3 (2026-09-22)
 
 ### Changed

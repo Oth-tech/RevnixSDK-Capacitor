@@ -8,6 +8,7 @@ import type {
   PlacementResolution,
   RegisterPurchaseInput,
   RegisterPurchaseResult,
+  RevnixAttribution,
   RevnixPaywallEvent,
   RevnixPlugin,
 } from './definitions';
@@ -155,6 +156,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   // ponytail: revnix-react 1.1.2 lacks getLastDeepLink; switch to this.require().getLastDeepLink() once it ships.
   async getLastDeepLink(): Promise<{ lastDeepLink: LastDeepLink | null }> {
     return { lastDeepLink: null };
+  }
+
+  async getAttribution(): Promise<{ attribution: RevnixAttribution | null }> {
+    return { attribution: null };
   }
 
   async handleInstallReferrer(): Promise<void> {}

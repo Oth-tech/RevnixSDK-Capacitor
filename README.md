@@ -179,6 +179,26 @@ the referrer, and the deferred link it carries, is lost for good. Calling it
 alongside the SDK's own automatic read just double-reports, which the server
 absorbs harmlessly.
 
+## Install attribution
+
+The install-attribution verdict the server reached for this customer —
+`referrer`/`click`/`impression`/`organic`, plus the link and UTM fields that
+produced it. Fires once the native SDK sees a verdict after cold-start install
+registration, and again whenever it changes (e.g. a late Android referrer
+reconciling an earlier organic verdict):
+
+```ts
+Revnix.addListener('attribution', ({ installMatch, linkToken, source, campaign }) => {
+  // installMatch is "referrer" | "click" | "impression" | "organic"
+});
+
+const { attribution } = await Revnix.getAttribution(); // null before any verdict
+```
+
+On Capacitor, `getAttribution` costs one GET per cold start: the native client
+only fetches attribution on its own once a callback is set, and this plugin
+always sets one so the `attribution` event can fire. Always `null` on web.
+
 ## API
 
 <docgen-index>
@@ -202,10 +222,12 @@ absorbs harmlessly.
 * [`handleDeepLink(...)`](#handledeeplink)
 * [`resolveDeepLink(...)`](#resolvedeeplink)
 * [`getLastDeepLink()`](#getlastdeeplink)
+* [`getAttribution()`](#getattribution)
 * [`handleInstallReferrer(...)`](#handleinstallreferrer)
 * [`addListener('diagnostic', ...)`](#addlistenerdiagnostic-)
 * [`addListener('implicitPaywall', ...)`](#addlistenerimplicitpaywall-)
 * [`addListener('deferredDeepLink', ...)`](#addlistenerdeferreddeeplink-)
+* [`addListener('attribution', ...)`](#addlistenerattribution-)
 * [`removeAllListeners()`](#removealllisteners)
 * [Interfaces](#interfaces)
 * [Type Aliases](#type-aliases)
@@ -585,6 +607,24 @@ rejects before `configure()`.
 --------------------
 
 
+### getAttribution()
+
+```typescript
+getAttribution() => Promise<{ attribution: RevnixAttribution | null; }>
+```
+
+AT1: the install-attribution verdict the native SDK holds for this
+customer — the same verdict the `attribution` listener delivers, read
+back on demand. `null` when no install has been recorded yet, or the
+request failed. On Capacitor this costs one GET per cold start (the
+native client only fetches on its own once a callback is set, and here
+one always is — see the `attribution` listener). Always `null` on web.
+
+**Returns:** <code>Promise&lt;{ attribution: <a href="#revnixattribution">RevnixAttribution</a> | null; }&gt;</code>
+
+--------------------
+
+
 ### handleInstallReferrer(...)
 
 ```typescript
@@ -676,6 +716,28 @@ that fires before this listener is attached is retained until it is.
 | ------------------ | -------------------------------------------------------------------------------- |
 | **`eventName`**    | <code>'deferredDeepLink'</code>                                                  |
 | **`listenerFunc`** | <code>(link: <a href="#deferreddeeplink">DeferredDeepLink</a>) =&gt; void</code> |
+
+**Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
+
+--------------------
+
+
+### addListener('attribution', ...)
+
+```typescript
+addListener(eventName: 'attribution', listenerFunc: (attribution: RevnixAttribution) => void) => Promise<PluginListenerHandle>
+```
+
+AT1: the install-attribution verdict, delivered the first time the
+native SDK sees one after cold-start install registration, and again
+whenever it changes (e.g. a late Android referrer reconciling an
+earlier organic verdict) — de-duplicated natively. An event that fires
+before this listener is attached is retained until it is.
+
+| Param              | Type                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| **`eventName`**    | <code>'attribution'</code>                                                                |
+| **`listenerFunc`** | <code>(attribution: <a href="#revnixattribution">RevnixAttribution</a>) =&gt; void</code> |
 
 **Returns:** <code>Promise&lt;<a href="#pluginlistenerhandle">PluginListenerHandle</a>&gt;</code>
 
@@ -920,6 +982,26 @@ The last deep link the native SDK recorded: a link passed to
 | **`receivedAt`** | <code>number</code> | Epoch milliseconds. |
 
 
+#### RevnixAttribution
+
+AT1: the install-attribution verdict the server reached for this
+customer. See `RevnixPlugin.getAttribution`.
+
+| Prop                 | Type                                                  | Description                                                                     |
+| -------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **`installMatch`**   | <code><a href="#installmatch">InstallMatch</a></code> |                                                                                 |
+| **`attributedAt`**   | <code>number</code>                                   | Epoch milliseconds.                                                             |
+| **`reattributedAt`** | <code>number</code>                                   | Epoch milliseconds a later match superseded the original verdict.               |
+| **`linkToken`**      | <code>string</code>                                   |                                                                                 |
+| **`referrerSource`** | <code>string</code>                                   | AT8: Android referrer source (play/huawei/samsung/xiaomi/vivo/meta/preinstall). |
+| **`matchSignals`**   | <code>string[]</code>                                 | AT6: which probabilistic signals matched (iOS).                                 |
+| **`source`**         | <code>string</code>                                   |                                                                                 |
+| **`medium`**         | <code>string</code>                                   |                                                                                 |
+| **`campaign`**       | <code>string</code>                                   |                                                                                 |
+| **`term`**           | <code>string</code>                                   |                                                                                 |
+| **`content`**        | <code>string</code>                                   |                                                                                 |
+
+
 #### PluginListenerHandle
 
 | Prop         | Type                                      |
@@ -990,6 +1072,13 @@ close or purchase that ended it. The server turns each into the ledger type
 Construct a type with a set of properties K of type T
 
 <code>{ [P in K]: T; }</code>
+
+
+#### InstallMatch
+
+AT1: how the server matched this install. `organic` when nothing did.
+
+<code>'referrer' | 'click' | 'impression' | 'organic'</code>
 
 
 #### ImplicitPlacement
