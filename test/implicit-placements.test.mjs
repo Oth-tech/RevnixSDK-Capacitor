@@ -128,9 +128,13 @@ describe('REV-272 implicit placements (Capacitor web)', () => {
     await settle();
 
     // /v1/installs is the launch chore every Capacitor app already makes; what
-    // must not appear is a second /v1/config or any trigger at all.
+    // must not appear is a second /v1/config or a trigger that resolves a
+    // paywall. The deep link still files its own attribution, report-only.
     assert.equal(calls.filter((c) => c.path === '/v1/config').length, 1);
-    assert.equal(triggers(calls).length, 0);
+    assert.deepEqual(
+      triggers(calls).map((c) => c.body.resolve),
+      [false],
+    );
   });
 
   test('handleDeepLink fires the one moment no SDK can see for itself', async () => {

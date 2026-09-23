@@ -2,13 +2,12 @@
 
 ## Unreleased
 
-### Added
+## 1.2.3 (2026-09-22)
 
-- **Automatic Play install referrer.** Android now reads the Play install
-  referrer itself during `configure()`; a host no longer needs to read it
-  with its own plugin and call `handleInstallReferrer`. That method still
-  exists and still works — calling it now just double-reports, which the
-  server absorbs harmlessly. (AT7)
+### Changed
+
+- Native SDKs: RevnixSDK-iOS 7e861d6 → 09c6ca6, RevnixSDK-Android 893b3db → 91eeb99.
+- Web: revnix-react ^1.1.2 → ^1.2.3.
 
 ## 1.2.2 (2026-09-19)
 
