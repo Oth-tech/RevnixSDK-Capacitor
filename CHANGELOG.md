@@ -11,6 +11,10 @@
   cold-start install registration, and again whenever it changes.
   Costs one GET per cold start on Capacitor; always `null` on web. (AT11)
 
+- **Ad revenue.** `logAdRevenue({ revenue, currency, ... })` reports an
+  impression-level ad payout from your mediation SDK's paid-event callback
+  (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget. (PT8)
+
 ## 1.2.3 (2026-09-22)
 
 ### Changed

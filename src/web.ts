@@ -214,6 +214,19 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     this.require().logPaywallEvent(event, viewId, rest);
   }
 
+  async logAdRevenue(options: {
+    revenue: number;
+    currency: string;
+    network?: string;
+    mediation?: string;
+    adUnit?: string;
+    placement?: string;
+    format?: string;
+    eventId?: string;
+  }): Promise<void> {
+    this.require().logAdRevenue(options);
+  }
+
   async setAttributes(options: {
     attributes: Record<string, string | number | null>;
   }): Promise<void> {
