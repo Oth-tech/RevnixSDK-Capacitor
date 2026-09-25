@@ -455,6 +455,40 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun logAdRevenue(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val revenue = call.getDouble("revenue")
+        if (revenue == null || revenue <= 0) {
+            call.reject("revenue must be a number > 0", "invalid")
+            return
+        }
+        val currency = call.getString("currency")
+        if (currency == null) {
+            call.reject("currency is required", "invalid")
+            return
+        }
+        val network = call.getString("network")
+        val mediation = call.getString("mediation")
+        val adUnit = call.getString("adUnit")
+        val placement = call.getString("placement")
+        val format = call.getString("format")
+        val eventId = call.getString("eventId")
+        scope.launch {
+            active.logAdRevenue(
+                revenue = revenue,
+                currency = currency,
+                network = network,
+                mediation = mediation,
+                adUnit = adUnit,
+                placement = placement,
+                format = format,
+                eventId = eventId,
+            )
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
     fun setAttributes(call: PluginCall) {
         val active = requireClient(call) ?: return
         val raw = call.getObject("attributes")

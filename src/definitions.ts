@@ -442,6 +442,24 @@ export interface RevnixPlugin {
     eventId?: string;
   }): Promise<void>;
 
+  /** PT8: report impression-level ad revenue from your mediation SDK's paid-event
+   *  callback (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget. */
+  logAdRevenue(options: {
+    /** Major units, e.g. 0.0032. Must be > 0. */
+    revenue: number;
+    /** ISO 4217, e.g. "USD". */
+    currency: string;
+    /** Monetization network that paid, e.g. "admob". */
+    network?: string;
+    /** Mediation platform that reported it, e.g. "applovin_max". */
+    mediation?: string;
+    adUnit?: string;
+    placement?: string;
+    /** "banner" | "interstitial" | "rewarded" | … */
+    format?: string;
+    eventId?: string;
+  }): Promise<void>;
+
   /** Set attributes on the current customer. Attributes are what A/B-test
    *  audiences target; set `country`, `app_version`, `locale`, or any custom
    *  key you want to segment on. `null` deletes a key.

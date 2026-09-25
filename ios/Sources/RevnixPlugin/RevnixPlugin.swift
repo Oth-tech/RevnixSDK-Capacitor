@@ -34,6 +34,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallShown", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logAdRevenue", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
@@ -419,6 +420,36 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 productId: productId,
                 code: code,
                 message: message,
+                eventId: eventId)
+            call.resolve()
+        }
+    }
+
+    @objc func logAdRevenue(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let revenue = call.getDouble("revenue"), revenue > 0 else {
+            call.reject("revenue must be a number > 0", "invalid")
+            return
+        }
+        guard let currency = call.getString("currency") else {
+            call.reject("currency is required", "invalid")
+            return
+        }
+        let network = call.getString("network")
+        let mediation = call.getString("mediation")
+        let adUnit = call.getString("adUnit")
+        let placement = call.getString("placement")
+        let format = call.getString("format")
+        let eventId = call.getString("eventId")
+        Task {
+            await client.logAdRevenue(
+                revenue: revenue,
+                currency: currency,
+                network: network,
+                mediation: mediation,
+                adUnit: adUnit,
+                placement: placement,
+                format: format,
                 eventId: eventId)
             call.resolve()
         }

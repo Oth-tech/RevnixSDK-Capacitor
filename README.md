@@ -218,6 +218,7 @@ always sets one so the `attribution` event can fire. Always `null` on web.
 * [`logPaywallShown(...)`](#logpaywallshown)
 * [`logPaywallClosed(...)`](#logpaywallclosed)
 * [`logPaywallEvent(...)`](#logpaywallevent)
+* [`logAdRevenue(...)`](#logadrevenue)
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
 * [`resolveDeepLink(...)`](#resolvedeeplink)
@@ -511,6 +512,22 @@ it across your own retries — to record each occurrence.
 | Param         | Type                                                                                                                                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ event: <a href="#revnixpaywallevent">RevnixPaywallEvent</a>; viewId: string; placementKey?: string; paywallId?: string; productId?: string; code?: string; message?: string; eventId?: string; }</code> |
+
+--------------------
+
+
+### logAdRevenue(...)
+
+```typescript
+logAdRevenue(options: { revenue: number; currency: string; network?: string; mediation?: string; adUnit?: string; placement?: string; format?: string; eventId?: string; }) => Promise<void>
+```
+
+PT8: report impression-level ad revenue from your mediation SDK's paid-event
+callback (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget.
+
+| Param         | Type                                                                                                                                                              |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ revenue: number; currency: string; network?: string; mediation?: string; adUnit?: string; placement?: string; format?: string; eventId?: string; }</code> |
 
 --------------------
 
