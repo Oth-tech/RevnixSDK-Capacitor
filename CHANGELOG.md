@@ -9,11 +9,17 @@
   UTM fields) the native SDK holds for this customer; the `attribution`
   listener delivers it as soon as the native SDK sees a verdict after
   cold-start install registration, and again whenever it changes.
-  Costs one GET per cold start on Capacitor; always `null` on web. (AT11)
+  The native SDK fetches the verdict on its own once after the install is
+  first reported; `getAttribution()` costs one GET per call. Always `null`
+  on web. (AT11)
 
 - **Ad revenue.** `logAdRevenue({ revenue, currency, ... })` reports an
   impression-level ad payout from your mediation SDK's paid-event callback
   (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget. (PT8)
+
+- Android: `configure()` now reads the Play Install Referrer itself, once per
+  install (adds `com.android.installreferrer:installreferrer:2.2`);
+  `handleInstallReferrer` is only needed for referrers read another way. (AT7)
 
 ## 1.2.3 (2026-09-22)
 
