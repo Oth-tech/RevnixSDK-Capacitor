@@ -204,6 +204,41 @@ The native SDK fetches the verdict on its own once after the install is first
 reported (and after a referrer or Apple Search Ads report); `getAttribution()`
 itself costs one GET per call. Always `null` on web.
 
+## Attribution import
+
+Call `setAttribution` from your MMP's own attribution callback so Revnix
+credits revenue to the network and campaign that MMP already identified.
+
+AppsFlyer's `onConversionDataSuccess`:
+
+```ts
+function onConversionDataSuccess(data: Record<string, string>) {
+  if (data.af_status !== 'Organic') {
+    Revnix.setAttribution({
+      provider: 'appsflyer',
+      network: data.media_source,
+      campaign: data.campaign,
+      adGroup: data.af_adset,
+      creative: data.af_ad,
+    });
+  }
+}
+```
+
+Adjust's attribution callback:
+
+```ts
+Adjust.addAttributionCallback((attribution) => {
+  Revnix.setAttribution({
+    provider: 'adjust',
+    network: attribution.network ?? '',
+    campaign: attribution.campaign,
+    adGroup: attribution.adgroup,
+    creative: attribution.creative,
+  });
+});
+```
+
 ## API
 
 <docgen-index>
@@ -224,6 +259,7 @@ itself costs one GET per call. Always `null` on web.
 * [`logPaywallClosed(...)`](#logpaywallclosed)
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`logAdRevenue(...)`](#logadrevenue)
+* [`setAttribution(...)`](#setattribution)
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
 * [`resolveDeepLink(...)`](#resolvedeeplink)
@@ -535,6 +571,23 @@ yourself.
 | Param         | Type                                                                                                                                                              |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ revenue: number; currency: string; network?: string; mediation?: string; adUnit?: string; placement?: string; format?: string; eventId?: string; }</code> |
+
+--------------------
+
+
+### setAttribution(...)
+
+```typescript
+setAttribution(options: { provider: MmpProvider; network: string; campaign?: string; adGroup?: string; creative?: string; }) => Promise<void>
+```
+
+PT11: hand the SDK an attribution verdict your MMP (Adjust, AppsFlyer,
+etc.) already reached, from that MMP's own callback. Fire-and-forget like
+the other beacons. Unreleased: not in revnix-capacitor 1.2.4.
+
+| Param         | Type                                                                                                                                        |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ provider: <a href="#mmpprovider">MmpProvider</a>; network: string; campaign?: string; adGroup?: string; creative?: string; }</code> |
 
 --------------------
 
@@ -1108,6 +1161,13 @@ Construct a type with a set of properties K of type T
 AT1: how the server matched this install. `organic` when nothing did.
 
 <code>'referrer' | 'click' | 'impression' | 'organic'</code>
+
+
+#### MmpProvider
+
+PT11: the MMP that reached this attribution verdict.
+
+<code>'adjust' | 'appsflyer' | 'singular' | 'branch' | 'kochava' | 'tenjin' | 'airbridge'</code>
 
 
 #### ImplicitPlacement

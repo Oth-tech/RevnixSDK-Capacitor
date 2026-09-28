@@ -94,6 +94,16 @@ export interface LastDeepLink {
 /** AT1: how the server matched this install. `organic` when nothing did. */
 export type InstallMatch = 'referrer' | 'click' | 'impression' | 'organic';
 
+/** PT11: the MMP that reached this attribution verdict. */
+export type MmpProvider =
+  | 'adjust'
+  | 'appsflyer'
+  | 'singular'
+  | 'branch'
+  | 'kochava'
+  | 'tenjin'
+  | 'airbridge';
+
 /** AT1: the install-attribution verdict the server reached for this
  *  customer. See `RevnixPlugin.getAttribution`. */
 export interface RevnixAttribution {
@@ -458,6 +468,17 @@ export interface RevnixPlugin {
     /** "banner" | "interstitial" | "rewarded" | … */
     format?: string;
     eventId?: string;
+  }): Promise<void>;
+
+  /** PT11: hand the SDK an attribution verdict your MMP (Adjust, AppsFlyer,
+   *  …) already reached, from that MMP's own callback. Fire-and-forget like
+   *  the other beacons. */
+  setAttribution(options: {
+    provider: MmpProvider;
+    network: string;
+    campaign?: string;
+    adGroup?: string;
+    creative?: string;
   }): Promise<void>;
 
   /** Set attributes on the current customer. Attributes are what A/B-test

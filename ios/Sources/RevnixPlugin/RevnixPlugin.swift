@@ -35,6 +35,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logAdRevenue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setAttribution", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
@@ -451,6 +452,30 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 placement: placement,
                 format: format,
                 eventId: eventId)
+            call.resolve()
+        }
+    }
+
+    @objc func setAttribution(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let provider = call.getString("provider") else {
+            call.reject("provider is required", "invalid")
+            return
+        }
+        guard let network = call.getString("network") else {
+            call.reject("network is required", "invalid")
+            return
+        }
+        let campaign = call.getString("campaign")
+        let adGroup = call.getString("adGroup")
+        let creative = call.getString("creative")
+        Task {
+            await client.setAttribution(
+                provider: provider,
+                network: network,
+                campaign: campaign,
+                adGroup: adGroup,
+                creative: creative)
             call.resolve()
         }
     }
