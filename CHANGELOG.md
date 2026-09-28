@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.2.4 (2026-09-26)
+
 ### Added
 
 - **Install attribution.** `getAttribution()` reads back the install-
@@ -20,6 +22,10 @@
 - Android: `configure()` now reads the Play Install Referrer itself, once per
   install (adds `com.android.installreferrer:installreferrer:2.2`);
   `handleInstallReferrer` is only needed for referrers read another way. (AT7)
+
+### Changed
+
+- Depends on revnix-react ^1.2.4.
 
 ## 1.2.3 (2026-09-22)
 
