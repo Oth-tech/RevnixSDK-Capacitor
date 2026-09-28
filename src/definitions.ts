@@ -44,6 +44,8 @@ export interface ConfigureOptions {
    * count as a new session rather than an app switch. Default 30 minutes.
    */
   sessionTimeoutMs?: number;
+  /** iOS only. Default true; set false to opt out of SKAdNetwork entirely. */
+  skan?: boolean;
 }
 
 /** REV-272: which of the six implicit moments fired. Lowercase throughout —
@@ -384,6 +386,18 @@ export interface RevnixPlugin {
   /** Fire-and-forget install beacon; recorded once per customer id. (Web:
    *  handled automatically by configure.) */
   registerInstall(options?: { platform?: string; appVersion?: string }): Promise<void>;
+
+  /** iOS only; no-op on Android and web. Sets an SKAdNetwork conversion
+   *  value — registration with Apple already happened automatically inside
+   *  `registerInstall`. `value` is the fine-grained conversion value, 0-63;
+   *  `coarse` is Apple's low/medium/high tier. The value goes to Apple only,
+   *  never to Revnix. Requires `NSAdvertisingAttributionReportEndpoint` in
+   *  the app's Info.plist, or Apple never delivers the postback. */
+  updateSkanConversionValue(options: {
+    value: number;
+    coarse?: 'low' | 'medium' | 'high';
+    lockWindow?: boolean;
+  }): Promise<void>;
 
   /** Fire-and-forget paywall impression. Call when the paywall becomes
    *  visible, not when you start loading it.
