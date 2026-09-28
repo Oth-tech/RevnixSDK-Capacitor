@@ -93,6 +93,29 @@ export interface LastDeepLink {
   receivedAt: number;
 }
 
+/** AT1: how the server matched this install. `organic` when nothing did. */
+export type InstallMatch = 'referrer' | 'click' | 'impression' | 'organic';
+
+/** AT1: the install-attribution verdict the server reached for this
+ *  customer. See `RevnixPlugin.getAttribution`. */
+export interface RevnixAttribution {
+  installMatch: InstallMatch;
+  /** Epoch milliseconds. */
+  attributedAt: number;
+  /** Epoch milliseconds a later match superseded the original verdict. */
+  reattributedAt?: number;
+  linkToken?: string;
+  /** AT8: Android referrer source (play/huawei/samsung/xiaomi/vivo/meta/preinstall). */
+  referrerSource?: string;
+  /** AT6: which probabilistic signals matched (iOS). */
+  matchSignals?: string[];
+  source?: string;
+  medium?: string;
+  campaign?: string;
+  term?: string;
+  content?: string;
+}
+
 /** REV-268: the app-suppliable half of the device attribute contract. Every
  *  field is optional; the server normalizes case, locale separators and
  *  alpha-3 storefronts. */
@@ -433,6 +456,24 @@ export interface RevnixPlugin {
     eventId?: string;
   }): Promise<void>;
 
+  /** PT8: report impression-level ad revenue from your mediation SDK's paid-event
+   *  callback (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget. */
+  logAdRevenue(options: {
+    /** Major units, e.g. 0.0032. Must be > 0. */
+    revenue: number;
+    /** ISO 4217, e.g. "USD". */
+    currency: string;
+    /** Monetization network that paid, e.g. "admob". */
+    network?: string;
+    /** Mediation platform that reported it, e.g. "applovin_max". */
+    mediation?: string;
+    adUnit?: string;
+    placement?: string;
+    /** "banner" | "interstitial" | "rewarded" | … */
+    format?: string;
+    eventId?: string;
+  }): Promise<void>;
+
   /** Set attributes on the current customer. Attributes are what A/B-test
    *  audiences target; set `country`, `app_version`, `locale`, or any custom
    *  key you want to segment on. `null` deletes a key.
@@ -478,6 +519,14 @@ export interface RevnixPlugin {
    *  been recorded, and always `null` on web for now. On iOS and Android it
    *  rejects before `configure()`. */
   getLastDeepLink(): Promise<{ lastDeepLink: LastDeepLink | null }>;
+
+  /** AT1: the install-attribution verdict the native SDK holds for this
+   *  customer — the same verdict the `attribution` listener delivers, read
+   *  back on demand. `null` when no install has been recorded yet, or the
+   *  request failed. On Capacitor this costs one GET per cold start (the
+   *  native client only fetches on its own once a callback is set, and here
+   *  one always is — see the `attribution` listener). Always `null` on web. */
+  getAttribution(): Promise<{ attribution: RevnixAttribution | null }>;
 
   /** REV-299: Android only — hand the SDK the raw Play Install Referrer
    *  string, read by your own install-referrer plugin (this package does not
@@ -526,6 +575,16 @@ export interface RevnixPlugin {
   addListener(
     eventName: 'deferredDeepLink',
     listenerFunc: (link: DeferredDeepLink) => void,
+  ): Promise<PluginListenerHandle>;
+
+  /** AT1: the install-attribution verdict, delivered the first time the
+   *  native SDK sees one after cold-start install registration, and again
+   *  whenever it changes (e.g. a late Android referrer reconciling an
+   *  earlier organic verdict) — de-duplicated natively. An event that fires
+   *  before this listener is attached is retained until it is. */
+  addListener(
+    eventName: 'attribution',
+    listenerFunc: (attribution: RevnixAttribution) => void,
   ): Promise<PluginListenerHandle>;
 
   removeAllListeners(): Promise<void>;

@@ -34,6 +34,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallShown", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "logAdRevenue", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
@@ -41,6 +42,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getLastDeepLink", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "handleInstallReferrer", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateSkanConversionValue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getAttribution", returnType: CAPPluginReturnPromise),
     ]
 
     private var client: RevnixClient?
@@ -116,6 +118,12 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 self?.notifyListeners(
                     "deferredDeepLink",
                     data: ["url": url.absoluteString, "match": match.rawValue],
+                    retainUntilConsumed: true)
+            },
+            onAttribution: { [weak self] attribution in
+                self?.notifyListeners(
+                    "attribution",
+                    data: Self.js(attribution),
                     retainUntilConsumed: true)
             },
             sessionTimeout: (call.getDouble("sessionTimeoutMs")
@@ -335,6 +343,17 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    @objc func getAttribution(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        Task {
+            if let attribution = await client.getAttribution() {
+                call.resolve(["attribution": Self.js(attribution)])
+            } else {
+                call.resolve(["attribution": NSNull()])
+            }
+        }
+    }
+
     @objc func registerInstall(_ call: CAPPluginCall) {
         guard let client = requireClient(call) else { return }
         let platform = call.getString("platform")
@@ -417,6 +436,36 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 productId: productId,
                 code: code,
                 message: message,
+                eventId: eventId)
+            call.resolve()
+        }
+    }
+
+    @objc func logAdRevenue(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let revenue = call.getDouble("revenue"), revenue > 0 else {
+            call.reject("revenue must be a number > 0", "invalid")
+            return
+        }
+        guard let currency = call.getString("currency") else {
+            call.reject("currency is required", "invalid")
+            return
+        }
+        let network = call.getString("network")
+        let mediation = call.getString("mediation")
+        let adUnit = call.getString("adUnit")
+        let placement = call.getString("placement")
+        let format = call.getString("format")
+        let eventId = call.getString("eventId")
+        Task {
+            await client.logAdRevenue(
+                revenue: revenue,
+                currency: currency,
+                network: network,
+                mediation: mediation,
+                adUnit: adUnit,
+                placement: placement,
+                format: format,
                 eventId: eventId)
             call.resolve()
         }
@@ -518,6 +567,23 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         // REV-219: always present, per the TS contract — a null/absent wire
         // value both surface as JS null.
         out["experiment"] = resolution.experimentJSON.map(any) ?? NSNull()
+        return out
+    }
+
+    private static func js(_ attribution: RevnixAttribution) -> [String: Any] {
+        var out: [String: Any] = [
+            "installMatch": attribution.installMatch,
+            "attributedAt": attribution.attributedAt,
+        ]
+        if let v = attribution.reattributedAt { out["reattributedAt"] = v }
+        if let v = attribution.linkToken { out["linkToken"] = v }
+        if let v = attribution.referrerSource { out["referrerSource"] = v }
+        if let v = attribution.matchSignals { out["matchSignals"] = v }
+        if let v = attribution.source { out["source"] = v }
+        if let v = attribution.medium { out["medium"] = v }
+        if let v = attribution.campaign { out["campaign"] = v }
+        if let v = attribution.term { out["term"] = v }
+        if let v = attribution.content { out["content"] = v }
         return out
     }
 

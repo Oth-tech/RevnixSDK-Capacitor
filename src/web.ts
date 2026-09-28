@@ -8,6 +8,7 @@ import type {
   PlacementResolution,
   RegisterPurchaseInput,
   RegisterPurchaseResult,
+  RevnixAttribution,
   RevnixPaywallEvent,
   RevnixPlugin,
 } from './definitions';
@@ -157,6 +158,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     return { lastDeepLink: null };
   }
 
+  async getAttribution(): Promise<{ attribution: RevnixAttribution | null }> {
+    return { attribution: null };
+  }
+
   async handleInstallReferrer(): Promise<void> {}
 
   async resolvePlacement(options: { placementKey: string }): Promise<PlacementResolution> {
@@ -211,6 +216,19 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   }): Promise<void> {
     const { event, viewId, ...rest } = options;
     this.require().logPaywallEvent(event, viewId, rest);
+  }
+
+  async logAdRevenue(options: {
+    revenue: number;
+    currency: string;
+    network?: string;
+    mediation?: string;
+    adUnit?: string;
+    placement?: string;
+    format?: string;
+    eventId?: string;
+  }): Promise<void> {
+    this.require().logAdRevenue(options);
   }
 
   async setAttributes(options: {

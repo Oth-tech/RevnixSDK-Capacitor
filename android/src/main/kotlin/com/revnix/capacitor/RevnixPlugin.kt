@@ -8,6 +8,7 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.revnix.CustomerEntitlements
 import com.revnix.PlacementResolution
+import com.revnix.RevnixAttribution
 import com.revnix.RegisterPurchaseInput
 import com.revnix.RegisterPurchaseResult
 import com.revnix.RevnixClient
@@ -21,6 +22,7 @@ import com.revnix.android.AndroidDeviceFacts
 import com.revnix.android.AndroidLifecycle
 import com.revnix.android.AndroidStorage
 import com.revnix.android.PlayBillingConnector
+import com.revnix.android.PlayInstallReferrer
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -122,6 +124,9 @@ class RevnixPlugin : Plugin() {
                         true,
                     )
                 },
+                onAttribution = { attribution ->
+                    notifyListeners("attribution", js(attribution), true)
+                },
             )
         )
         // REV-272: retire the previous client BEFORE replacing it. Its
@@ -140,6 +145,7 @@ class RevnixPlugin : Plugin() {
         scope.launch {
             created.registerInstall(platform = "android-capacitor", appVersion = null)
         }
+        PlayInstallReferrer.collect(context, created, platform = "android-capacitor")
         call.resolve()
     }
 
@@ -344,6 +350,18 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getAttribution(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        scope.launch {
+            val attribution = active.getAttribution()
+            val out = JSObject()
+            if (attribution == null) out.put("attribution", JSONObject.NULL)
+            else out.put("attribution", js(attribution))
+            call.resolve(out)
+        }
+    }
+
+    @PluginMethod
     fun resolvePlacement(call: PluginCall) {
         val active = requireClient(call) ?: return
         val key = call.getString("placementKey") ?: ""
@@ -435,6 +453,40 @@ class RevnixPlugin : Plugin() {
                 productId = productId,
                 code = code,
                 message = message,
+                eventId = eventId,
+            )
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun logAdRevenue(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val revenue = call.getDouble("revenue")
+        if (revenue == null || revenue <= 0) {
+            call.reject("revenue must be a number > 0", "invalid")
+            return
+        }
+        val currency = call.getString("currency")
+        if (currency == null) {
+            call.reject("currency is required", "invalid")
+            return
+        }
+        val network = call.getString("network")
+        val mediation = call.getString("mediation")
+        val adUnit = call.getString("adUnit")
+        val placement = call.getString("placement")
+        val format = call.getString("format")
+        val eventId = call.getString("eventId")
+        scope.launch {
+            active.logAdRevenue(
+                revenue = revenue,
+                currency = currency,
+                network = network,
+                mediation = mediation,
+                adUnit = adUnit,
+                placement = placement,
+                format = format,
                 eventId = eventId,
             )
             call.resolve()
@@ -542,6 +594,22 @@ class RevnixPlugin : Plugin() {
             null, JsonNull -> put("experiment", JSONObject.NULL)
             else -> put("experiment", js(experiment))
         }
+    }
+
+    private fun js(attribution: RevnixAttribution): JSObject = JSObject().apply {
+        put("installMatch", attribution.installMatch)
+        put("attributedAt", attribution.attributedAt)
+        attribution.reattributedAt?.let { put("reattributedAt", it) }
+        attribution.linkToken?.let { put("linkToken", it) }
+        attribution.referrerSource?.let { put("referrerSource", it) }
+        attribution.matchSignals?.let {
+            put("matchSignals", org.json.JSONArray().apply { it.forEach { s -> put(s) } })
+        }
+        attribution.source?.let { put("source", it) }
+        attribution.medium?.let { put("medium", it) }
+        attribution.campaign?.let { put("campaign", it) }
+        attribution.term?.let { put("term", it) }
+        attribution.content?.let { put("content", it) }
     }
 
     /** kotlinx JsonElement → org.json, via its canonical string form. */
