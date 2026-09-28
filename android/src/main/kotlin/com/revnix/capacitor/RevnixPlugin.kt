@@ -494,6 +494,34 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setAttribution(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val provider = call.getString("provider")
+        if (provider == null) {
+            call.reject("provider is required", "invalid")
+            return
+        }
+        val network = call.getString("network")
+        if (network == null) {
+            call.reject("network is required", "invalid")
+            return
+        }
+        val campaign = call.getString("campaign")
+        val adGroup = call.getString("adGroup")
+        val creative = call.getString("creative")
+        scope.launch {
+            active.setAttribution(
+                provider = provider,
+                network = network,
+                campaign = campaign,
+                adGroup = adGroup,
+                creative = creative,
+            )
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
     fun setAttributes(call: PluginCall) {
         val active = requireClient(call) ?: return
         val raw = call.getObject("attributes")

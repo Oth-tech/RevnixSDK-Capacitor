@@ -5,6 +5,7 @@ import type {
   ConfigureOptions,
   CustomerEntitlements,
   LastDeepLink,
+  MmpProvider,
   PlacementResolution,
   RegisterPurchaseInput,
   RegisterPurchaseResult,
@@ -229,6 +230,16 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     eventId?: string;
   }): Promise<void> {
     this.require().logAdRevenue(options);
+  }
+
+  async setAttribution(options: {
+    provider: MmpProvider;
+    network: string;
+    campaign?: string;
+    adGroup?: string;
+    creative?: string;
+  }): Promise<void> {
+    this.require().setAttribution(options);
   }
 
   async setAttributes(options: {

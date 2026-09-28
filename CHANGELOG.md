@@ -17,6 +17,10 @@
   impression-level ad payout from your mediation SDK's paid-event callback
   (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget. (PT8)
 
+- **Attribution import.** `setAttribution({ provider, network, ... })` hands
+  the SDK an attribution verdict your MMP (Adjust, AppsFlyer, …) already
+  reached, from that MMP's own callback. Fire-and-forget. (PT11)
+
 - Android: `configure()` now reads the Play Install Referrer itself, once per
   install (adds `com.android.installreferrer:installreferrer:2.2`);
   `handleInstallReferrer` is only needed for referrers read another way. (AT7)
