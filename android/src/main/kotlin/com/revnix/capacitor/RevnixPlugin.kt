@@ -345,6 +345,11 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun updateSkanConversionValue(call: PluginCall) {
+        call.resolve()
+    }
+
+    @PluginMethod
     fun getAttribution(call: PluginCall) {
         val active = requireClient(call) ?: return
         scope.launch {

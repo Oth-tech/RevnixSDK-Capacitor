@@ -183,6 +183,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     // Handled by configure() via revnix-react's reportInstalls.
   }
 
+  async updateSkanConversionValue(): Promise<void> {
+    // SKAdNetwork does not exist on the web.
+  }
+
   async logPaywallShown(options?: {
     placementKey?: string;
     paywallId?: string;
