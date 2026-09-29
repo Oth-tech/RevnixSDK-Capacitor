@@ -495,6 +495,12 @@ export interface RevnixPlugin {
     creative?: string;
   }): Promise<void>;
 
+  /** Register this device's push token for uninstall measurement: Revnix
+   *  sends a daily silent probe and records `app.uninstalled` when APNs/FCM
+   *  report the token dead. iOS/Android only (no-op on web),
+   *  fire-and-forget. */
+  setPushToken(options: { token: string }): Promise<void>;
+
   /** Set attributes on the current customer. Attributes are what A/B-test
    *  audiences target; set `country`, `app_version`, `locale`, or any custom
    *  key you want to segment on. `null` deletes a key.

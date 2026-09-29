@@ -255,6 +255,28 @@ Adjust.addAttributionCallback((attribution) => {
 });
 ```
 
+## Uninstall measurement
+
+Revnix measures uninstalls the way Adjust/AppsFlyer do: hand it the
+device's push token, and once a day a silent push probes it; when
+APNs/FCM reports the token dead, the customer gets an `app.uninstalled`
+event. Pair it with `@capacitor/push-notifications`:
+
+```ts
+import { PushNotifications } from '@capacitor/push-notifications';
+
+PushNotifications.addListener('registration', (token) => {
+  Revnix.setPushToken({ token: token.value });
+});
+```
+
+No-op on web (falls through to `revnix-react`, which has no device push
+token to collect). Requires the app's own push setup: Firebase Cloud
+Messaging on Android, Push Notifications + Background Modes → Remote
+notifications on iOS; no notification permission needed, the probe is
+silent. See
+[Uninstall measurement](https://revnix.io/docs/uninstall-measurement).
+
 ## API
 
 <docgen-index>
@@ -277,6 +299,7 @@ Adjust.addAttributionCallback((attribution) => {
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`logAdRevenue(...)`](#logadrevenue)
 * [`setAttribution(...)`](#setattribution)
+* [`setPushToken(...)`](#setpushtoken)
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
 * [`resolveDeepLink(...)`](#resolvedeeplink)
@@ -625,6 +648,24 @@ the other beacons. Unreleased: not in revnix-capacitor 1.2.4.
 | Param         | Type                                                                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ provider: <a href="#mmpprovider">MmpProvider</a>; network: string; campaign?: string; adGroup?: string; creative?: string; }</code> |
+
+--------------------
+
+
+### setPushToken(...)
+
+```typescript
+setPushToken(options: { token: string; }) => Promise<void>
+```
+
+Register this device's push token for uninstall measurement: Revnix
+sends a daily silent probe and records `app.uninstalled` when APNs/FCM
+report the token dead. iOS/Android only (no-op on web),
+fire-and-forget.
+
+| Param         | Type                             |
+| ------------- | --------------------------------- |
+| **`options`** | <code>{ token: string; }</code> |
 
 --------------------
 

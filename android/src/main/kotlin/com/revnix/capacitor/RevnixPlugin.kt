@@ -522,6 +522,20 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun setPushToken(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val token = call.getString("token")
+        if (token == null) {
+            call.reject("token is required", "invalid")
+            return
+        }
+        scope.launch {
+            active.setPushToken(token)
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
     fun setAttributes(call: PluginCall) {
         val active = requireClient(call) ?: return
         val raw = call.getObject("attributes")
