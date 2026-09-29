@@ -36,6 +36,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logAdRevenue", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttribution", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setPushToken", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
@@ -492,6 +493,18 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 campaign: campaign,
                 adGroup: adGroup,
                 creative: creative)
+            call.resolve()
+        }
+    }
+
+    @objc func setPushToken(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let token = call.getString("token") else {
+            call.reject("token is required", "invalid")
+            return
+        }
+        Task {
+            await client.setPushToken(token)
             call.resolve()
         }
     }
