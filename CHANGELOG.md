@@ -4,6 +4,10 @@
 
 ### Added
 
+- **Custom events.** `track({ event, properties?, eventId? })` reports a
+  custom in-app event to the ledger as `custom.<event>`. Fire-and-forget,
+  like `logAdRevenue`. Not for purchases. (MS8)
+
 - **Install attribution.** `getAttribution()` reads back the install-
   attribution verdict (`referrer`/`click`/`impression`/`organic`, link and
   UTM fields) the native SDK holds for this customer; the `attribution`

@@ -232,6 +232,16 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     this.require().logAdRevenue(options);
   }
 
+  async track(options: {
+    event: string;
+    properties?: Record<string, string | number | boolean>;
+    eventId?: string;
+  }): Promise<void> {
+    this.require().track(options.event, options.properties, {
+      eventId: options.eventId,
+    });
+  }
+
   async setAttribution(options: {
     provider: MmpProvider;
     network: string;

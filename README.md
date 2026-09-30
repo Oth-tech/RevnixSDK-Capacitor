@@ -277,6 +277,21 @@ notifications on iOS; no notification permission needed, the probe is
 silent. See
 [Uninstall measurement](https://revnix.io/docs/uninstall-measurement).
 
+## Custom events
+
+Report a custom in-app event — name + optional flat properties — with
+`track()`. Fire-and-forget, like `logAdRevenue`/`setAttribution`. Not for
+purchases; those stay on `registerPurchase`.
+
+```ts
+await Revnix.track({
+  event: 'level_up',
+  properties: { level: 12, mode: 'hard' },
+});
+```
+
+`event` must match `^[a-z0-9_]{1,64}$`; an invalid name sends nothing. Recorded on the ledger as `custom.<event>`.
+
 ## API
 
 <docgen-index>
