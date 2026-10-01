@@ -489,6 +489,15 @@ export interface RevnixPlugin {
     eventId?: string;
   }): Promise<void>;
 
+  /** MS8: report a custom in-app event, name + optional flat properties.
+   *  Fire-and-forget, like the other beacons. Not for purchases — those stay
+   *  on `registerPurchase`. `event` must match `^[a-z0-9_]{1,64}$`. */
+  track(options: {
+    event: string;
+    properties?: Record<string, string | number | boolean>;
+    eventId?: string;
+  }): Promise<void>;
+
   /** PT11: hand the SDK an attribution verdict your MMP (Adjust, AppsFlyer,
    *  …) already reached, from that MMP's own callback. Fire-and-forget like
    *  the other beacons. */

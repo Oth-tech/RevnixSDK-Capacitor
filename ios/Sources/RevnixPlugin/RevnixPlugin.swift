@@ -35,6 +35,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallClosed", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logAdRevenue", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "track", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttribution", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setPushToken", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestTrackingAuthorization", returnType: CAPPluginReturnPromise),
@@ -471,6 +472,31 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
                 placement: placement,
                 format: format,
                 eventId: eventId)
+            call.resolve()
+        }
+    }
+
+    @objc func track(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let event = call.getString("event") else {
+            call.reject("event is required", "invalid")
+            return
+        }
+        let raw = call.getObject("properties")
+        let properties: [String: JSONValue]? = raw?.compactMapValues { value in
+            if let text = value as? String {
+                return .string(text)
+            } else if let number = value as? NSNumber {
+                if CFGetTypeID(number as CFTypeRef) == CFBooleanGetTypeID() {
+                    return .bool(number.boolValue)
+                }
+                return .number(number.doubleValue)
+            }
+            return nil
+        }
+        let eventId = call.getString("eventId")
+        Task {
+            await client.track(event, properties: properties, eventId: eventId)
             call.resolve()
         }
     }

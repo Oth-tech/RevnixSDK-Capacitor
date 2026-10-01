@@ -494,6 +494,28 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun track(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val event = call.getString("event")
+        if (event == null) {
+            call.reject("event is required", "invalid")
+            return
+        }
+        val raw = call.getObject("properties")
+        val properties = mutableMapOf<String, Any?>()
+        if (raw != null) {
+            for (key in raw.keys()) {
+                if (!raw.isNull(key)) properties[key] = raw.get(key)
+            }
+        }
+        val eventId = call.getString("eventId")
+        scope.launch {
+            active.track(event, properties, eventId)
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
     fun setAttribution(call: PluginCall) {
         val active = requireClient(call) ?: return
         val provider = call.getString("provider")
