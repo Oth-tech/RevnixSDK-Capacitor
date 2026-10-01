@@ -246,6 +246,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     this.require().setPushToken(options.token);
   }
 
+  async requestTrackingAuthorization(): Promise<{ status: number }> {
+    return { status: -1 };
+  }
+
   async setAttributes(options: {
     attributes: Record<string, string | number | null>;
   }): Promise<void> {

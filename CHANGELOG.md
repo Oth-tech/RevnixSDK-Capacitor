@@ -4,6 +4,11 @@
 
 ### Added
 
+- **App Tracking Transparency.** `requestTrackingAuthorization()` shows
+  Apple's ATT prompt and resolves `{ status }` (0–3, -1 on Android and web);
+  the answer and, when authorized, the IDFA are stored on the customer.
+  `configure({ attWaitTimeoutMs })` holds the first install report until the
+  prompt is answered. (TP3)
 - **Install attribution.** `getAttribution()` reads back the install-
   attribution verdict (`referrer`/`click`/`impression`/`organic`, link and
   UTM fields) the native SDK holds for this customer; the `attribution`
