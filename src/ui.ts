@@ -773,7 +773,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
         card.appendChild(textDiv('rvx-paywall-review-quote', `“${review.quote}”`, theme.textPrimary));
       }
       if (review.author) {
-        card.appendChild(textDiv('rvx-paywall-review-author', `— ${review.author}`, theme.textSecondary));
+        card.appendChild(textDiv('rvx-paywall-review-author', review.author, theme.textSecondary));
       }
       return card;
     };
