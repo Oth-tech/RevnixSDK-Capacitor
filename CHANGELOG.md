@@ -18,6 +18,14 @@
   custom in-app event to the ledger as `custom.<event>`. Fire-and-forget,
   like `logAdRevenue`. Not for purchases. (MS8)
 
+- **Attribution import.** `setAttribution({ provider, network, ... })` hands
+  the SDK an attribution verdict your MMP (Adjust, AppsFlyer, …) already
+  reached, from that MMP's own callback. Fire-and-forget. (PT11)
+
+## 1.2.4 (2026-09-26)
+
+### Added
+
 - **Install attribution.** `getAttribution()` reads back the install-
   attribution verdict (`referrer`/`click`/`impression`/`organic`, link and
   UTM fields) the native SDK holds for this customer; the `attribution`
@@ -31,13 +39,13 @@
   impression-level ad payout from your mediation SDK's paid-event callback
   (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget. (PT8)
 
-- **Attribution import.** `setAttribution({ provider, network, ... })` hands
-  the SDK an attribution verdict your MMP (Adjust, AppsFlyer, …) already
-  reached, from that MMP's own callback. Fire-and-forget. (PT11)
-
 - Android: `configure()` now reads the Play Install Referrer itself, once per
   install (adds `com.android.installreferrer:installreferrer:2.2`);
   `handleInstallReferrer` is only needed for referrers read another way. (AT7)
+
+### Changed
+
+- Depends on revnix-react ^1.2.4.
 
 ## 1.2.3 (2026-09-22)
 
