@@ -558,6 +558,11 @@ class RevnixPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun requestTrackingAuthorization(call: PluginCall) {
+        call.resolve(JSObject().put("status", -1))
+    }
+
+    @PluginMethod
     fun setAttributes(call: PluginCall) {
         val active = requireClient(call) ?: return
         val raw = call.getObject("attributes")

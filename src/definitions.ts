@@ -46,6 +46,11 @@ export interface ConfigureOptions {
   sessionTimeoutMs?: number;
   /** iOS only. Default true; set false to opt out of SKAdNetwork entirely. */
   skan?: boolean;
+  /** iOS only (TP3). Hold the first `registerInstall` report up to this many
+   *  milliseconds while the App Tracking Transparency prompt is unanswered,
+   *  so the install goes out with the IDFA already stored. Unset = never
+   *  wait. */
+  attWaitTimeoutMs?: number;
 }
 
 /** REV-272: which of the six implicit moments fired. Lowercase throughout —
@@ -509,6 +514,12 @@ export interface RevnixPlugin {
    *  report the token dead. iOS/Android only (no-op on web),
    *  fire-and-forget. */
   setPushToken(options: { token: string }): Promise<void>;
+
+  /** TP3: show Apple's App Tracking Transparency prompt and return its
+   *  answer: 0 notDetermined, 1 restricted, 2 denied, 3 authorized, or -1
+   *  off iOS. Stores `att_status` on the customer, plus `idfa` when
+   *  authorized. Needs `NSUserTrackingUsageDescription` in Info.plist. */
+  requestTrackingAuthorization(): Promise<{ status: number }>;
 
   /** Set attributes on the current customer. Attributes are what A/B-test
    *  audiences target; set `country`, `app_version`, `locale`, or any custom

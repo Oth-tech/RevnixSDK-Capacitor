@@ -38,6 +38,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "track", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttribution", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setPushToken", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "requestTrackingAuthorization", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttributes", returnType: CAPPluginReturnPromise),
         // REV-272: the one implicit moment no SDK can see for itself.
         CAPPluginMethod(name: "handleDeepLink", returnType: CAPPluginReturnPromise),
@@ -131,7 +132,8 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             },
             sessionTimeout: (call.getDouble("sessionTimeoutMs")
                 ?? revnixDefaultSessionTimeout * 1000) / 1000.0,
-            skan: call.getBool("skan") ?? true
+            skan: call.getBool("skan") ?? true,
+            attWaitTimeout: call.getDouble("attWaitTimeoutMs").map { $0 / 1000 }
         )
         configOverride?(&config)
         let created = RevnixClient(config)
@@ -533,6 +535,11 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             await client.setPushToken(token)
             call.resolve()
         }
+    }
+
+    @objc func requestTrackingAuthorization(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        Task { call.resolve(["status": await client.requestTrackingAuthorization()]) }
     }
 
     @objc func setAttributes(_ call: CAPPluginCall) {

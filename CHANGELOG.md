@@ -4,6 +4,12 @@
 
 ### Added
 
+- **App Tracking Transparency.** `requestTrackingAuthorization()` shows
+  Apple's ATT prompt and resolves `{ status }` (0–3, -1 on Android and web);
+  the answer and, when authorized, the IDFA are stored on the customer.
+  `configure({ attWaitTimeoutMs })` holds the first install report until the
+  prompt is answered. (TP3)
+
 - **Custom events.** `track({ event, properties?, eventId? })` reports a
   custom in-app event to the ledger as `custom.<event>`. Fire-and-forget,
   like `logAdRevenue`. Not for purchases. (MS8)
