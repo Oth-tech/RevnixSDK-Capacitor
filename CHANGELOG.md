@@ -4,6 +4,10 @@
 
 ### Added
 
+- **iOS privacy manifest.** The plugin now bundles revnix-swift's
+  `PrivacyInfo.xcprivacy` (CocoaPods `RevnixCapacitor_Privacy` bundle; SwiftPM
+  through the Revnix package). (TP8)
+
 - **App Tracking Transparency.** `requestTrackingAuthorization()` shows
   Apple's ATT prompt and resolves `{ status }` (0–3, -1 on Android and web);
   the answer and, when authorized, the IDFA are stored on the customer.

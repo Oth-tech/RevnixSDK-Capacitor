@@ -16,6 +16,7 @@ Pod::Spec.new do |s|
   #   s.dependency 'Revnix', '~> 0.2'
   s.source_files = 'ios/Sources/**/*.{swift,h,m,c,cc,mm,cpp}',
                    'ios/Revnix/Sources/Revnix/**/*.swift'
+  s.resource_bundles = { 'RevnixCapacitor_Privacy' => ['ios/Revnix/Sources/Revnix/PrivacyInfo.xcprivacy'] }
   # revnix-swift's floor (StoreKit 2 + SwiftUI renderer).
   s.ios.deployment_target = '16.0'
   s.dependency 'Capacitor'
