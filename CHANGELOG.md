@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.3.0 (2026-10-02)
+
 ### Added
 
 - **iOS privacy manifest.** The plugin now bundles revnix-swift's
@@ -21,6 +23,11 @@
 - **Attribution import.** `setAttribution({ provider, network, ... })` hands
   the SDK an attribution verdict your MMP (Adjust, AppsFlyer, …) already
   reached, from that MMP's own callback. Fire-and-forget. (PT11)
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS 0bf5a10 → 07df4ff, RevnixSDK-Android a4a9424 → 690f109.
+- Web: revnix-react ^1.2.4 → ^1.3.0.
 
 ## 1.2.4 (2026-09-26)
 
