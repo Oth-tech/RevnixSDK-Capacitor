@@ -62,21 +62,24 @@ revnix-app's `main` dispatches this repo's `Release` workflow
 1. builds and tests `main`;
 2. moves the native submodules to their upstream `main` and bumps the
    `revnix-react` dependency to the version just released;
-3. reads `## Unreleased` in `CHANGELOG.md` to pick the bump —
-   `### Breaking` → major, `### Added` → minor, anything else → patch, empty →
-   patch with a lockstep note (the version always moves, by decision);
-4. bumps `package.json` / `package-lock.json`, dates the changelog entry
+3. releases only when something changed: the code moved since the last
+   release, the native submodules moved, or `revnix-react` was bumped —
+   otherwise the run is skipped (no bump, PR, publish, tag, or release), by
+   decision (2026-10-01);
+4. when releasing, reads `## Unreleased` in `CHANGELOG.md` to pick the bump —
+   `### Breaking` → major, `### Added` → minor, anything else → patch;
+5. bumps `package.json` / `package-lock.json`, dates the changelog entry
    (the submodule and dependency moves are appended under `### Changed`),
    regenerates the docgen blocks in `README.md`, and lands it all through a
    pull request merged with a merge commit (the org ruleset allows nothing
    else on `main`);
-5. checks the tarball carries the native sources, publishes via npm trusted
+6. checks the tarball carries the native sources, publishes via npm trusted
    publishing (OIDC), then tags `vX.Y.Z` and `X.Y.Z` (the podspec fetches the
    bare one) and cuts a GitHub release.
 
 So the only thing a change needs is a bullet under the right `###` heading in
 `## Unreleased`. Run it by hand from the Actions tab (`bump` and
-`revnix_react_version` can be forced).
+`revnix_react_version` can be forced; forcing a bump always releases).
 
 One-time setup (an npm owner): on npmjs.com, package `revnix-capacitor` →
 Settings → Trusted Publisher → GitHub Actions, organisation `Oth-tech`,

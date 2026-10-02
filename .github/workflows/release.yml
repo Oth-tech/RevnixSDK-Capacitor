@@ -13,10 +13,6 @@
 #     dependency is bumped to the version the caller just released (or the
 #     latest on npm when run by hand);
 #   * rebuilds, which regenerates the docgen blocks in README.md.
-#
-# The version always moves, even when nothing changed — lockstep with
-# revnix-app releases by decision (2026-09-05). Publishing uses npm trusted
-# publishing (OIDC); an NPM_TOKEN secret, if present, is a break-glass override.
 
 name: Release
 run-name: "Release ${{ inputs.run_key || format('manual-{0}', github.run_id) }}"
@@ -114,9 +110,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and test main before touching it
-        run: npm test
-
       # A previous run may have merged the bump and then failed to publish
       # (trusted publisher not configured, npm outage). main is then one
       # version ahead of npm with no tag. Publish that version instead of
@@ -139,13 +132,17 @@ jobs:
             } >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Build and test the pending version
+        if: steps.pending.outputs.pending == 'true'
+        run: npm test
+
       - name: Has the code moved since the last release?
         if: steps.pending.outputs.pending != 'true'
         id: changed
         run: |
           CURRENT=$(node -p "require('./package.json').version")
           if git rev-parse -q --verify "refs/tags/v$CURRENT" >/dev/null; then
-            if git diff --quiet "v$CURRENT" HEAD -- . ':(exclude)CHANGELOG.md'; then
+            if git diff --quiet "v$CURRENT" HEAD -- . ':(exclude).github' ':(exclude)*.md'; then
               CHANGED=false
             else
               CHANGED=true
@@ -189,24 +186,42 @@ jobs:
           WANT: ${{ inputs.revnix_react_version }}
         run: |
           if [ -z "$WANT" ]; then WANT=$(npm view revnix-react version); fi
-          HAVE=$(node -p "require('./package.json').dependencies['revnix-react']")
+          HAVE_RANGE=$(node -p "require('./package.json').dependencies['revnix-react']")
+          HAVE=${HAVE_RANGE#^}
           NOTE=""
-          if [ "$HAVE" != "^$WANT" ]; then
+          if [ "$WANT" != "$HAVE" ] && [ "$(printf '%s\n%s\n' "$HAVE" "$WANT" | sort -V | tail -1)" = "$WANT" ]; then
             npm install "revnix-react@^$WANT" --save
-            NOTE="Web: revnix-react $HAVE → ^$WANT."
+            NOTE="Web: revnix-react $HAVE_RANGE → ^$WANT."
             echo "$NOTE"
           else
-            echo "revnix-react already at $HAVE."
+            echo "revnix-react already at $HAVE_RANGE; not moving to $WANT."
           fi
           echo "note=$NOTE" >> "$GITHUB_OUTPUT"
 
+      - name: Decide whether to release
+        id: gate
+        env:
+          PENDING: ${{ steps.pending.outputs.pending }}
+          CHANGED: ${{ steps.changed.outputs.changed }}
+          NATIVES_NOTE: ${{ steps.natives.outputs.note }}
+          REACT_NOTE: ${{ steps.react.outputs.note }}
+          BUMP: ${{ inputs.bump }}
+        run: |
+          echo "current=$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+          if [ "$PENDING" = "true" ] || [ "$BUMP" != "auto" ] || [ "$CHANGED" = "true" ] || [ -n "$NATIVES_NOTE" ] || [ -n "$REACT_NOTE" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Nothing changed since the last release; skipping."
+          fi
+
       # docgen rewrites README.md as part of the build; the release carries it.
       - name: Rebuild and test with the moved pieces
-        if: steps.pending.outputs.pending != 'true'
+        if: steps.pending.outputs.pending != 'true' && steps.gate.outputs.release == 'true'
         run: npm test
 
       - name: Decide and apply the next version
-        if: steps.pending.outputs.pending != 'true'
+        if: steps.pending.outputs.pending != 'true' && steps.gate.outputs.release == 'true'
         id: version
         env:
           NATIVES_NOTE: ${{ steps.natives.outputs.note }}
@@ -223,7 +238,7 @@ jobs:
             "${ARGS[@]}"
 
       - name: Refuse to reuse a version that already exists
-        if: steps.pending.outputs.pending != 'true'
+        if: steps.pending.outputs.pending != 'true' && steps.gate.outputs.release == 'true'
         env:
           NEXT: ${{ steps.version.outputs.next }}
         run: |
@@ -238,7 +253,7 @@ jobs:
           fi
 
       - name: Land the bump through a pull request (main takes merge commits only)
-        if: steps.pending.outputs.pending != 'true'
+        if: steps.pending.outputs.pending != 'true' && steps.gate.outputs.release == 'true'
         id: land
         env:
           NEXT: ${{ steps.version.outputs.next }}
@@ -279,6 +294,7 @@ jobs:
           echo "pr=$PR_URL" >> "$GITHUB_OUTPUT"
 
       - name: Resolve what to publish
+        if: steps.gate.outputs.release == 'true'
         id: pub
         env:
           PENDING: ${{ steps.pending.outputs.pending }}
@@ -295,6 +311,7 @@ jobs:
       # build compile; a checkout without submodules would publish an empty
       # native half and every consumer's build would break.
       - name: Check the tarball carries the native SDKs
+        if: steps.gate.outputs.release == 'true'
         run: |
           npm ci
           # npm 11 prints `[{ files }]`; npm 12 prints `{ "<name>": { files } }`.
@@ -315,6 +332,7 @@ jobs:
           echo "$LIST" | wc -l | xargs echo "files in tarball:"
 
       - name: Publish to npm
+        if: steps.gate.outputs.release == 'true'
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
@@ -329,6 +347,7 @@ jobs:
       # The podspec fetches `:tag => version`, so the tag is part of the
       # release, not decoration.
       - name: Tag and release
+        if: steps.gate.outputs.release == 'true'
         env:
           NEXT: ${{ steps.pub.outputs.next }}
           SHA: ${{ steps.pub.outputs.sha }}
@@ -351,10 +370,11 @@ jobs:
       - name: Summary
         if: always()
         env:
+          RELEASE: ${{ steps.gate.outputs.release }}
+          GATE_CURRENT: ${{ steps.gate.outputs.current }}
           CURRENT: ${{ steps.version.outputs.current }}
           NEXT: ${{ steps.pub.outputs.next }}
           LEVEL: ${{ steps.version.outputs.level }}
-          LOCKSTEP: ${{ steps.version.outputs.lockstep }}
           PR: ${{ steps.land.outputs.pr }}
           PENDING: ${{ steps.pending.outputs.pending }}
           APP_SHA: ${{ inputs.app_sha }}
@@ -362,15 +382,21 @@ jobs:
           ANDROID: ${{ steps.natives.outputs.android }}
         run: |
           {
-            echo "## revnix-capacitor ${NEXT:-?}"
-            echo ""
-            if [ "$PENDING" = "true" ]; then
-              echo "- published the version already on main (a previous run merged it but did not publish)"
+            if [ "$RELEASE" = "false" ]; then
+              echo "## revnix-capacitor"
+              echo ""
+              echo "- no changes since v${GATE_CURRENT:-?}, skipped"
             else
-              echo "- from ${CURRENT:-?} (${LEVEL:-?} bump, lockstep=${LOCKSTEP:-?})"
+              echo "## revnix-capacitor ${NEXT:-?}"
+              echo ""
+              if [ "$PENDING" = "true" ]; then
+                echo "- published the version already on main (a previous run merged it but did not publish)"
+              else
+                echo "- from ${CURRENT:-?} (${LEVEL:-?} bump)"
+              fi
+              [ -n "$PR" ] && echo "- release PR: $PR"
+              [ -n "$IOS" ] && echo "- natives: RevnixSDK-iOS ${IOS:0:7}, RevnixSDK-Android ${ANDROID:0:7}"
+              [ -n "$APP_SHA" ] && echo "- revnix-app: $APP_SHA"
             fi
-            [ -n "$PR" ] && echo "- release PR: $PR"
-            [ -n "$IOS" ] && echo "- natives: RevnixSDK-iOS ${IOS:0:7}, RevnixSDK-Android ${ANDROID:0:7}"
-            [ -n "$APP_SHA" ] && echo "- revnix-app: $APP_SHA"
             echo "- status: ${{ job.status }}"
           } >> "$GITHUB_STEP_SUMMARY"
