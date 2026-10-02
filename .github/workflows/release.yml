@@ -29,6 +29,10 @@ on:
         type: choice
         options: [auto, major, minor, patch]
         default: auto
+      version:
+        description: "Exact next version (x.y.z, above the current one). Empty = bump."
+        type: string
+        default: ""
       revnix_react_version:
         description: "revnix-react version to depend on. Empty = latest on npm."
         type: string
@@ -217,6 +221,7 @@ jobs:
           [ -n "$REACT_NOTE" ] && ARGS+=(--note "$REACT_NOTE")
           node scripts/release.mjs \
             --bump "${{ inputs.bump }}" \
+            --version "${{ inputs.version }}" \
             --app-sha "${{ inputs.app_sha }}" \
             --changed "${{ steps.changed.outputs.changed }}" \
             --notes-out "$RUNNER_TEMP/release-notes.md" \
