@@ -313,8 +313,10 @@ await Revnix.track({
 * [`logPaywallClosed(...)`](#logpaywallclosed)
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`logAdRevenue(...)`](#logadrevenue)
+* [`track(...)`](#track)
 * [`setAttribution(...)`](#setattribution)
 * [`setPushToken(...)`](#setpushtoken)
+* [`requestTrackingAuthorization()`](#requesttrackingauthorization)
 * [`setAttributes(...)`](#setattributes)
 * [`handleDeepLink(...)`](#handledeeplink)
 * [`resolveDeepLink(...)`](#resolvedeeplink)
@@ -351,7 +353,7 @@ start the store observer: iOS watches StoreKit 2 `Transaction.updates`
 (renewals, Ask to Buy approvals, refunds, purchases on another device),
 Android replays Play Billing purchases. Observed transactions are
 registered with proof and then finished/acknowledged by Revnix, so a
-purchase you also register from JS comes back `duplicate: true`, not
+purchase you also register from JS comes back `duplicate: true` — not
 an error. If another IAP plugin must finish iOS transactions itself,
 keep that in mind: Revnix finishes only after the claim is recorded or
 durably queued. Calling configure again retires the previous observer.
@@ -584,12 +586,12 @@ id is what lets the ledger pair a close with the display it ended.
 logPaywallClosed(options: { viewId: string; placementKey?: string; paywallId?: string; }) => Promise<void>
 ```
 
-Fire-and-forget paywall dismissal (REV-252): the other half of a
+Fire-and-forget paywall dismissal (REV-252) — the other half of a
 display's life. Idempotent per view id, exactly like the impression.
 Pass the id `logPaywallShown` resolved with for this display.
 
 A close is a DECLINE. Do not report one for a display that ended in a
-purchase: with implicit placements on, a close is also the
+purchase — with implicit placements on, a close is also the
 `paywall_decline` moment, and a win-back offer seconds after a successful
 purchase is the one thing an operator never means.
 
@@ -606,7 +608,7 @@ purchase is the one thing an operator never means.
 logPaywallEvent(options: { event: RevnixPaywallEvent; viewId: string; placementKey?: string; paywallId?: string; productId?: string; code?: string; message?: string; eventId?: string; }) => Promise<void>
 ```
 
-Report one of the six paywall interactions (REV-263): what the customer
+Report one of the six paywall interactions (REV-263) — what the customer
 DID on a display, between the `logPaywallShown` that opened it and the
 `logPaywallClosed` (or purchase) that ended it.
 
@@ -622,8 +624,8 @@ your app performs the store call, so report `purchase_abandoned` /
 `purchase_failed` from your own purchase error handling.
 
 `eventId` is the idempotency key and defaults to `viewId`, which caps the
-report at one per display per event. Pass one per occurrence (and reuse
-it across your own retries) to record each occurrence.
+report at one per display per event. Pass one per occurrence — and reuse
+it across your own retries — to record each occurrence.
 
 | Param         | Type                                                                                                                                                                                                            |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -640,12 +642,27 @@ logAdRevenue(options: { revenue: number; currency: string; network?: string; med
 
 PT8: report impression-level ad revenue from your mediation SDK's paid-event
 callback (AdMob paid event, AppLovin MAX ad revenue paid). Fire-and-forget.
-Unreleased: not in revnix-capacitor 1.2.3; on 1.2.3 call `POST /v1/ad-revenue`
-yourself.
 
 | Param         | Type                                                                                                                                                              |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ revenue: number; currency: string; network?: string; mediation?: string; adUnit?: string; placement?: string; format?: string; eventId?: string; }</code> |
+
+--------------------
+
+
+### track(...)
+
+```typescript
+track(options: { event: string; properties?: Record<string, string | number | boolean>; eventId?: string; }) => Promise<void>
+```
+
+MS8: report a custom in-app event, name + optional flat properties.
+Fire-and-forget, like the other beacons. Not for purchases — those stay
+on `registerPurchase`. `event` must match `^[a-z0-9_]{1,64}$`.
+
+| Param         | Type                                                                                                                                    |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ event: string; properties?: <a href="#record">Record</a>&lt;string, string \| number \| boolean&gt;; eventId?: string; }</code> |
 
 --------------------
 
@@ -657,8 +674,8 @@ setAttribution(options: { provider: MmpProvider; network: string; campaign?: str
 ```
 
 PT11: hand the SDK an attribution verdict your MMP (Adjust, AppsFlyer,
-etc.) already reached, from that MMP's own callback. Fire-and-forget like
-the other beacons. Unreleased: not in revnix-capacitor 1.2.4.
+…) already reached, from that MMP's own callback. Fire-and-forget like
+the other beacons.
 
 | Param         | Type                                                                                                                                        |
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -678,9 +695,25 @@ sends a daily silent probe and records `app.uninstalled` when APNs/FCM
 report the token dead. iOS/Android only (no-op on web),
 fire-and-forget.
 
-| Param         | Type                             |
-| ------------- | --------------------------------- |
+| Param         | Type                            |
+| ------------- | ------------------------------- |
 | **`options`** | <code>{ token: string; }</code> |
+
+--------------------
+
+
+### requestTrackingAuthorization()
+
+```typescript
+requestTrackingAuthorization() => Promise<{ status: number; }>
+```
+
+TP3: show Apple's App Tracking Transparency prompt and return its
+answer: 0 notDetermined, 1 restricted, 2 denied, 3 authorized, or -1
+off iOS. Stores `att_status` on the customer, plus `idfa` when
+authorized. Needs `NSUserTrackingUsageDescription` in Info.plist.
+
+**Returns:** <code>Promise&lt;{ status: number; }&gt;</code>
 
 --------------------
 
@@ -714,16 +747,15 @@ handleDeepLink(options: { url: string; }) => Promise<void>
 ```
 
 REV-272: hand the SDK the URL that opened your app, forwarded from your
-`appUrlOpen` listener; it also carries the URL that launched a closed
+`appUrlOpen` listener — it also carries the URL that launched a closed
 app, on both platforms. Don't also pass `App.getLaunchUrl()`, that is
 the same open and would count twice; the launch URL goes to the first
 `appUrlOpen` listener only.
 
-This is the one implicit moment the SDK cannot see for itself: the URL
+This is the one implicit moment the SDK cannot see for itself — the URL
 reaches the host's entry point, and an SDK intercepting it would be
-fighting the app's routing. Every link is reported for its `link.*`
-facts; a paywall is presented only when `implicitPlacements` is on and
-`deeplink_open` is configured in the dashboard.
+fighting the app's routing. Does nothing unless `deeplink_open` is
+configured in the dashboard.
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
@@ -785,12 +817,11 @@ getAttribution() => Promise<{ attribution: RevnixAttribution | null; }>
 ```
 
 AT1: the install-attribution verdict the native SDK holds for this
-customer, the same verdict the `attribution` listener delivers, read
+customer — the same verdict the `attribution` listener delivers, read
 back on demand. `null` when no install has been recorded yet, or the
-request failed. Each call costs one GET; the native SDK also fetches
-the verdict on its own once after the install is first reported (and
-after a referrer or Apple Search Ads report). Always `null` on web.
-Unreleased: not in revnix-capacitor 1.2.3.
+request failed. On Capacitor this costs one GET per cold start (the
+native client only fetches on its own once a callback is set, and here
+one always is — see the `attribution` listener). Always `null` on web.
 
 **Returns:** <code>Promise&lt;{ attribution: <a href="#revnixattribution">RevnixAttribution</a> | null; }&gt;</code>
 
@@ -803,19 +834,17 @@ Unreleased: not in revnix-capacitor 1.2.3.
 handleInstallReferrer(options: { referrer: string; }) => Promise<void>
 ```
 
-REV-299: Android only. Hand the SDK the raw Play Install Referrer
-string, passed here verbatim. In revnix-capacitor 1.2.3 this is the only
-way to report it: read it with your own install-referrer plugin. From
-the release after 1.2.3, `configure()` reads it itself and this is only
-for a host that reads it some other way. Resolves as a no-op on iOS and web:
+REV-299: Android only — hand the SDK the raw Play Install Referrer
+string, read by your own install-referrer plugin (this package does not
+add one) and passed here verbatim. Resolves as a no-op on iOS and web:
 iOS has no install referrer, and a Capacitor web app has no store
 install to defer a link from.
 
-On Android, `configure()` must run first: like every other Android
+On Android, `configure()` must run first — like every other Android
 method, this rejects if it hasn't. A host that reads the referrer
 during its own boot must await/catch this call (rather than fire it
-before `configure()`), or the referrer (and the deferred link it
-carries) is lost for good.
+before `configure()`), or the referrer — and the deferred link it
+carries — is lost for good.
 
 | Param         | Type                               |
 | ------------- | ---------------------------------- |
@@ -859,7 +888,7 @@ Requires `implicitPlacements: true` in configure().
 display you present. That is what tells the SDK this display came FROM an
 implicit trigger, and it is the only thing that stops a `paywall_decline`
 paywall from firing `paywall_decline` again when the customer dismisses
-it: a loop with no way out but force-quitting. The server refuses to
+it — a loop with no way out but force-quitting. The server refuses to
 serve back the very same paywall as a backstop, but it cannot see a rule
 that points at a DIFFERENT paywall which points back.
 
@@ -879,7 +908,7 @@ that points at a DIFFERENT paywall which points back.
 addListener(eventName: 'deferredDeepLink', listenerFunc: (link: DeferredDeepLink) => void) => Promise<PluginListenerHandle>
 ```
 
-REV-299: a deferred deep link the server matched to this install: the
+REV-299: a deferred deep link the server matched to this install — the
 link a customer clicked before installing. Fires at most once per
 install. Android: `exact`, matched from the referrer passed to
 `handleInstallReferrer`. iOS: `probabilistic`, matched by the server on
@@ -905,9 +934,8 @@ addListener(eventName: 'attribution', listenerFunc: (attribution: RevnixAttribut
 AT1: the install-attribution verdict, delivered the first time the
 native SDK sees one after cold-start install registration, and again
 whenever it changes (e.g. a late Android referrer reconciling an
-earlier organic verdict), de-duplicated natively. An event that fires
-before this listener is attached is retained until it is. Unreleased:
-not in revnix-capacitor 1.2.3.
+earlier organic verdict) — de-duplicated natively. An event that fires
+before this listener is attached is retained until it is.
 
 | Param              | Type                                                                                      |
 | ------------------ | ----------------------------------------------------------------------------------------- |
@@ -941,9 +969,10 @@ removeAllListeners() => Promise<void>
 | **`entitlementsTtlMs`**    | <code>number</code>                                 | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | **`offlineMaxCacheAgeMs`** | <code>number</code>                                 | Snapshots older than this serve as all-inactive. Default 14 days.                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | **`device`**               | <code><a href="#devicefacts">DeviceFacts</a></code> | REV-268: overrides for the device facts sent with every placement resolve, so targeting rules ("US storefront", "app version at least 3") can be evaluated on the request that serves the paywall. The native SDKs detect platform, OS version, app version, locale, currency, model and the sandbox flag themselves (the web build detects what a browser exposes); pass only what you know better. Stored on the customer as reserved `device.*` attributes, visible in the dashboard. |
-| **`implicitPlacements`**   | <code>boolean</code>                                | REV-272: turn on implicit placements, the six moments the SDK reports on its own (`app_install`, `app_launch`, `session_start`, `deeplink_open`, `paywall_decline`, `transaction_abandon`). With this on, the SDK asks `GET /v1/config` once and then fires only for the moments this app has configured in the dashboard, emitting each one that resolves to a paywall as an `implicitPaywall` event. Off by default: without a listener there is nothing to do with the answer.       |
+| **`implicitPlacements`**   | <code>boolean</code>                                | REV-272: turn on implicit placements — the six moments the SDK reports on its own (`app_install`, `app_launch`, `session_start`, `deeplink_open`, `paywall_decline`, `transaction_abandon`). With this on, the SDK asks `GET /v1/config` once and then fires only for the moments this app has configured in the dashboard, emitting each one that resolves to a paywall as an `implicitPaywall` event. Off by default: without a listener there is nothing to do with the answer.       |
 | **`sessionTimeoutMs`**     | <code>number</code>                                 | REV-272: how long the app must have been backgrounded for the return to count as a new session rather than an app switch. Default 30 minutes.                                                                                                                                                                                                                                                                                                                                            |
 | **`skan`**                 | <code>boolean</code>                                | iOS only. Default true; set false to opt out of SKAdNetwork entirely.                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| **`attWaitTimeoutMs`**     | <code>number</code>                                 | iOS only (TP3). Hold the first `registerInstall` report up to this many milliseconds while the App Tracking Transparency prompt is unanswered, so the install goes out with the IDFA already stored. Unset = never wait.                                                                                                                                                                                                                                                                 |
 
 
 #### DeviceFacts
@@ -954,12 +983,12 @@ alpha-3 storefronts.
 
 | Prop             | Type                 | Description                                         |
 | ---------------- | -------------------- | --------------------------------------------------- |
-| **`platform`**   | <code>string</code>  | "ios", "android", "web", …: lowercase family name.  |
+| **`platform`**   | <code>string</code>  | "ios", "android", "web", … — lowercase family name. |
 | **`osVersion`**  | <code>string</code>  | e.g. "18.1".                                        |
 | **`appVersion`** | <code>string</code>  | The host app's version, e.g. "1.2.10".              |
 | **`locale`**     | <code>string</code>  | "en-US" or "en_US".                                 |
 | **`currency`**   | <code>string</code>  | ISO 4217, e.g. "USD".                               |
-| **`storefront`** | <code>string</code>  | Store country: alpha-2 ("US") or alpha-3 ("USA").  |
+| **`storefront`** | <code>string</code>  | Store country — alpha-2 ("US") or alpha-3 ("USA").  |
 | **`model`**      | <code>string</code>  | Hardware model identifier.                          |
 | **`sandbox`**    | <code>boolean</code> | True in a sandbox / debug build.                    |
 
@@ -1083,7 +1112,7 @@ draws this with its own components; prices still come from the store
 | **`review`**             | <code><a href="#paywallreview">PaywallReview</a></code>                                                                         |                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **`offer`**              | <code><a href="#paywalloffer">PaywallOffer</a></code>                                                                           |                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | **`footer`**             | <code><a href="#paywallfooter">PaywallFooter</a></code>                                                                         |                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| **`blocks`**             | <code>unknown</code>                                                                                                            | A designed paywall: the block tree the dashboard's builder authored. When present `renderRevnixPaywall` renders THIS and the fields above act as the fallback for clients that predate block rendering, so an app on an older SDK keeps showing a sane classic screen instead of nothing. Typed as `PaywallBlockDoc` in the renderer; opaque here so a consumer that only reads the config pulls in no renderer types. |
+| **`blocks`**             | <code>unknown</code>                                                                                                            | A designed paywall: the block tree the dashboard's builder authored. When present `renderRevnixPaywall` renders THIS and the fields above act as the fallback for clients that predate block rendering — so an app on an older SDK keeps showing a sane classic screen instead of nothing. Typed as `PaywallBlockDoc` in the renderer; opaque here so a consumer that only reads the config pulls in no renderer types. |
 
 
 #### PaywallFeature
@@ -1198,7 +1227,7 @@ A background failure the SDK swallowed (queue drains, telemetry beacons).
 #### ImplicitTrigger
 
 REV-272: one implicit moment that resolved to a paywall. Only ever
-delivered WITH a paywall: a moment the server answered with none (nothing
+delivered WITH a paywall — a moment the server answered with none (nothing
 attached, or the same paywall the customer is leaving) is reported and
 then dropped, since there is nothing to present.
 
@@ -1210,7 +1239,7 @@ then dropped, since there is nothing to present.
 
 #### DeferredDeepLink
 
-REV-299: a deferred deep link the server attributed to this install: the
+REV-299: a deferred deep link the server attributed to this install — the
 link a customer clicked before installing. Fires at most once per install.
 Android: `exact`, matched from the referrer passed to
 `handleInstallReferrer`. iOS: `probabilistic`, matched by the server on
@@ -1235,7 +1264,7 @@ Wire-identical to the other Revnix SDKs (openapi.yaml is the source).
 
 #### RevnixPaywallEvent
 
-REV-263: the six paywall interactions `logPaywallEvent` can report: what
+REV-263: the six paywall interactions `logPaywallEvent` can report — what
 the customer did on a display, between the view that opened it and the
 close or purchase that ended it. The server turns each into the ledger type
 `paywall.&lt;name&gt;`.
@@ -1247,14 +1276,7 @@ close or purchase that ended it. The server turns each into the ledger type
 
 Construct a type with a set of properties K of type T
 
-<code>{ [P in K]: T; }</code>
-
-
-#### InstallMatch
-
-AT1: how the server matched this install. `organic` when nothing did.
-
-<code>'referrer' | 'click' | 'impression' | 'organic'</code>
+<code>{ [P in K]: T; }</code>
 
 
 #### MmpProvider
@@ -1264,9 +1286,16 @@ PT11: the MMP that reached this attribution verdict.
 <code>'adjust' | 'appsflyer' | 'singular' | 'branch' | 'kochava' | 'tenjin' | 'airbridge'</code>
 
 
+#### InstallMatch
+
+AT1: how the server matched this install. `organic` when nothing did.
+
+<code>'referrer' | 'click' | 'impression' | 'organic'</code>
+
+
 #### ImplicitPlacement
 
-REV-272: which of the six implicit moments fired. Lowercase throughout:
+REV-272: which of the six implicit moments fired. Lowercase throughout —
 `deeplink_open`, not Superwall's `deepLink_open`, because a placement key
 must match `^[a-z0-9][a-z0-9._-]{0,63}$` server-side.
 
