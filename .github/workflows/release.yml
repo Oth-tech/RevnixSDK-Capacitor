@@ -190,6 +190,11 @@ jobs:
           WANT: ${{ inputs.revnix_react_version }}
         run: |
           if [ -z "$WANT" ]; then WANT=$(npm view revnix-react version); fi
+          for _ in $(seq 1 40); do
+            [ -n "$(npm view --prefer-online "revnix-react@$WANT" version 2>/dev/null)" ] && break
+            echo "revnix-react@$WANT is not on npm yet; waiting."
+            sleep 15
+          done
           HAVE_RANGE=$(node -p "require('./package.json').dependencies['revnix-react']")
           HAVE=${HAVE_RANGE#^}
           NOTE=""
