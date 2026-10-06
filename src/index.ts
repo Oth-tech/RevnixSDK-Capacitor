@@ -51,8 +51,10 @@ export {
 // these are for a host that renders a block document by hand.
 export {
   detectLocale,
+  linkLabels,
   localeChain,
   localizeBlockDoc,
   normalizeLocale,
+  setLocale,
 } from './locale';
 export { Revnix };

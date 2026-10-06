@@ -21,6 +21,8 @@
 //     card a tag reads the SELECTED package (render contract v2 §2), so the
 //     renewal line every template carries shows the price the CTA buys.
 
+import { linkLabels } from './locale.js';
+
 /** Per-block visual style. Everything optional — a block renders sensibly
  *  with no style at all. Sizes are px numbers; colors are any CSS color, or a
  *  palette token (`@accent`, `@text`, `@bg`, `@accentInk`, optionally with an
@@ -219,7 +221,8 @@ export interface PaywallBlockDoc {
   fontFamily?: string;
   blocks: PaywallBlock[];
   /** REV-271: the language the blocks' own copy is written in. Absent = "en".
-   *  Never a key in `locales` — the tree IS that language's version. */
+   *  Never a key in a stored doc's `locales` — the tree IS that language's
+   *  version. A localized copy names the language it was localized to. */
   defaultLocale?: string;
   /** REV-271: translations, keyed by BCP-47 tag then by block string key
    *  (`<blockId>.text`, `<blockId>.items.0.title`, …). Only words differ per
@@ -1283,12 +1286,13 @@ function renderBlockIn(
     }
 
     case 'links': {
+      const labels = linkLabels(doc.defaultLocale);
       const entries: Array<{ label: string; url?: string; onPress?: () => void }> = [];
-      if (block.showRestore ?? true) entries.push({ label: 'Restore', onPress: ctx.onRestore });
+      if (block.showRestore ?? true) entries.push({ label: labels.restore, onPress: ctx.onRestore });
       if (block.showTerms ?? true)
-        entries.push({ label: 'Terms', url: block.termsUrl ?? ctx.footer?.termsUrl, onPress: ctx.onTerms });
+        entries.push({ label: labels.terms, url: block.termsUrl ?? ctx.footer?.termsUrl, onPress: ctx.onTerms });
       if (block.showPrivacy ?? true)
-        entries.push({ label: 'Privacy', url: block.privacyUrl ?? ctx.footer?.privacyUrl, onPress: ctx.onPrivacy });
+        entries.push({ label: labels.privacy, url: block.privacyUrl ?? ctx.footer?.privacyUrl, onPress: ctx.onPrivacy });
       if (entries.length === 0) return null;
       const node = div(document);
       node.style.display = 'flex';
