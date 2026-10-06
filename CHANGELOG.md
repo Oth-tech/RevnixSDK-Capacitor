@@ -2,10 +2,17 @@
 
 ## Unreleased
 
+## 1.4.0 (2026-10-06)
+
 ### Added
 
 - `setLocale(tag?)` and `linkLabels(locale)` exports; the links block's
   Restore, Terms and Privacy labels are localized (43 languages).
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS 07df4ff → dbd541a, RevnixSDK-Android 690f109 → de624a1.
+- Web: revnix-react ^1.3.0 → ^1.4.0.
 
 ## 1.3.0 (2026-10-02)
 
