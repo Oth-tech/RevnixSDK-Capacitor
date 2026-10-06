@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- `setLocale(tag?)` and `linkLabels(locale)` exports; the links block's
+  Restore, Terms and Privacy labels are localized (43 languages).
+
 ## 1.3.0 (2026-10-02)
 
 ### Added
@@ -23,6 +28,10 @@
 - **Attribution import.** `setAttribution({ provider, network, ... })` hands
   the SDK an attribution verdict your MMP (Adjust, AppsFlyer, …) already
   reached, from that MMP's own callback. Fire-and-forget. (PT11)
+
+- **Uninstall measurement.** `setPushToken({ token })` registers the device
+  push token; Revnix sends a daily silent probe and records
+  `app.uninstalled` when APNs/FCM report it dead. No-op on web. (MS1)
 
 ### Changed
 

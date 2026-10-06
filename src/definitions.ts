@@ -541,8 +541,9 @@ export interface RevnixPlugin {
    *
    *  This is the one implicit moment the SDK cannot see for itself — the URL
    *  reaches the host's entry point, and an SDK intercepting it would be
-   *  fighting the app's routing. Does nothing unless `deeplink_open` is
-   *  configured in the dashboard. */
+   *  fighting the app's routing. Every link is reported so its `link.*`
+   *  attributes land on the customer; it presents a paywall only when implicit
+   *  placements are on and `deeplink_open` is configured in the dashboard. */
   handleDeepLink(options: { url: string }): Promise<void>;
 
   /** REV-299: unwrap a link an email service provider (Mailchimp, SendGrid,
@@ -575,9 +576,9 @@ export interface RevnixPlugin {
    *  one always is — see the `attribution` listener). Always `null` on web. */
   getAttribution(): Promise<{ attribution: RevnixAttribution | null }>;
 
-  /** REV-299: Android only — hand the SDK the raw Play Install Referrer
-   *  string, read by your own install-referrer plugin (this package does not
-   *  add one) and passed here verbatim. Resolves as a no-op on iOS and web:
+  /** REV-299: Android only. `configure()` already reads the Play Install
+   *  Referrer once per install; call this only with a referrer you read some
+   *  other way, passed verbatim. Resolves as a no-op on iOS and web:
    *  iOS has no install referrer, and a Capacitor web app has no store
    *  install to defer a link from.
    *
