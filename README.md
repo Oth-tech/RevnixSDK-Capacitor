@@ -118,6 +118,12 @@ The dashboard's QR preview opens the app on the `deeplink_open` moment with
 skips its view/close analytics; a custom UI presenting the design itself must
 check `PREVIEW_PLACEMENT_KEY` the same way before wiring a purchase handler.
 
+`locale` picks a designed paywall's language (defaults to the device's).
+Unreleased (on `main`, not in 1.3.0): `import { setLocale } from
+'revnix-capacitor'; setLocale('ur')` forces every paywall rendered
+afterwards into that language, `setLocale()` clears it; the Restore, Terms
+and Privacy footer labels follow the paywall's language.
+
 ## Deep links
 
 ```ts
@@ -162,11 +168,9 @@ Revnix.addListener('deferredDeepLink', ({ url, match }) => {
 });
 ```
 
-In revnix-capacitor 1.2.3 the Android Play install referrer is manual: read
-it with an install-referrer plugin and pass it to `handleInstallReferrer`
-after `configure()`. Unreleased (not in revnix-capacitor 1.2.3): the SDK
-reads the referrer itself during `configure()`, and `handleInstallReferrer`
-is then only for a host that reads the referrer some other way:
+Since 1.2.4 the SDK reads the Android Play install referrer itself during
+`configure()`; `handleInstallReferrer` is only for a host that reads the
+referrer some other way (on 1.2.3 it was the only way):
 
 ```ts
 await Revnix.configure({ apiKey, baseUrl });
@@ -178,12 +182,12 @@ install referrer, and matches on install instead. On Android it rejects if
 `configure()` hasn't run yet, so a host reading the referrer during its own
 boot must await/catch it rather than fire it before `configure()`; otherwise
 the referrer, and the deferred link it carries, is lost for good. Calling it
-alongside the SDK's own automatic read (unreleased) just double-reports,
-which the server absorbs harmlessly.
+alongside the SDK's own automatic read just double-reports, which the
+server absorbs harmlessly.
 
 ## Install attribution
 
-Unreleased: not in revnix-capacitor 1.2.3. On 1.2.3, read the verdict with
+Needs revnix-capacitor 1.2.4 or later. On 1.2.3, read the verdict with
 `GET /v1/customers/{id}/attribution` from your own code.
 
 The install-attribution verdict the server reached for this customer:
@@ -336,7 +340,10 @@ await Revnix.track({
 Failure taxonomy: rejected calls carry `code` (network · timeout ·
 rate_limited · server · bad_response · auth · not_found · purchase_blocked
 · invalid) and `data.isRetryable`. Deliberate rejections (401/403/404/409)
-are never masked by a cache: a kill-switch must stay a kill-switch.
+are never masked by a cache: a kill-switch must stay a kill-switch. That
+taxonomy is the native (iOS/Android) bridges only: on web, rejections are
+revnix-react's `RevnixError` classes instead, read `status` and
+`isRetryable` (no `code`).
 
 <docgen-api>
 <!--Update the source file JSDoc comments and rerun docgen to update the docs below-->
@@ -754,8 +761,9 @@ the same open and would count twice; the launch URL goes to the first
 
 This is the one implicit moment the SDK cannot see for itself — the URL
 reaches the host's entry point, and an SDK intercepting it would be
-fighting the app's routing. Does nothing unless `deeplink_open` is
-configured in the dashboard.
+fighting the app's routing. Every link is reported so its `link.*`
+attributes land on the customer; it presents a paywall only when implicit
+placements are on and `deeplink_open` is configured in the dashboard.
 
 | Param         | Type                          |
 | ------------- | ----------------------------- |
@@ -834,9 +842,9 @@ one always is — see the `attribution` listener). Always `null` on web.
 handleInstallReferrer(options: { referrer: string; }) => Promise<void>
 ```
 
-REV-299: Android only — hand the SDK the raw Play Install Referrer
-string, read by your own install-referrer plugin (this package does not
-add one) and passed here verbatim. Resolves as a no-op on iOS and web:
+REV-299: Android only. `configure()` already reads the Play Install
+Referrer once per install; call this only with a referrer you read some
+other way, passed verbatim. Resolves as a no-op on iOS and web:
 iOS has no install referrer, and a Capacitor web app has no store
 install to defer a link from.
 
