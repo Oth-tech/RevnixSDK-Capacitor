@@ -1,5 +1,6 @@
 import Capacitor
 import Foundation
+import StoreKit
 
 // revnix-swift comes from the git submodule at ios/Revnix. Under Swift Package
 // Manager it is its own module (imported here); under CocoaPods the podspec
@@ -27,6 +28,8 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "isEntitled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "waitForEntitlements", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "registerPurchase", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "purchase", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "restore", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "retryPendingPurchases", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "pendingPurchaseCount", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "resolvePlacement", returnType: CAPPluginReturnPromise),
@@ -270,6 +273,40 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             } catch {
                 Self.reject(call, error)
             }
+        }
+    }
+
+    @objc func purchase(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let productId = call.getString("productId") else {
+            call.reject("productId is required", "invalid", nil, ["isRetryable": false])
+            return
+        }
+        Task {
+            do {
+                guard let product = try await Product.products(for: [productId]).first else {
+                    call.reject(
+                        "No store product \"\(productId)\"", "product_not_found", nil,
+                        ["isRetryable": false])
+                    return
+                }
+                let result = try await RevnixStoreKit.purchase(product, client: client)
+                call.resolve(["result": result.map(Self.js) ?? NSNull()])
+            } catch StoreKitError.networkError(let underlying) {
+                call.reject("\(underlying)", "store_error", underlying, ["isRetryable": true])
+            } catch let err where err is StoreKitError || err is Product.PurchaseError {
+                call.reject("\(err)", "store_error", err, ["isRetryable": false])
+            } catch {
+                Self.reject(call, error)
+            }
+        }
+    }
+
+    @objc func restore(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        Task {
+            try? await AppStore.sync()
+            call.resolve(["restored": await RevnixStoreKit.restore(client: client)])
         }
     }
 

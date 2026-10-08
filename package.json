@@ -1,7 +1,7 @@
 {
   "name": "revnix-capacitor",
   "version": "1.4.1",
-  "description": "Revnix subscriptions and entitlements for Capacitor.",
+  "description": "Revnix SDK for Capacitor: in-app purchases through StoreKit 2 and Google Play Billing, entitlements, paywalls, A/B tests and attribution over the Revnix /v1 API.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
   "types": "dist/esm/index.d.ts",
@@ -12,6 +12,7 @@
     "android/revnix-kotlin/revnix-android/src/main/",
     "android/build.gradle",
     "dist/",
+    "docs/",
     "ios/Sources",
     "ios/Tests",
     "ios/Revnix/Package.swift",
@@ -26,13 +27,22 @@
     "type": "git",
     "url": "git+https://github.com/Oth-tech/RevnixSDK-Capacitor.git"
   },
+  "homepage": "https://www.revnix.io/docs/capacitor",
   "bugs": {
     "url": "https://github.com/Oth-tech/RevnixSDK-Capacitor/issues"
   },
   "keywords": [
     "capacitor",
     "plugin",
-    "native"
+    "native",
+    "revnix",
+    "in-app-purchase",
+    "subscriptions",
+    "paywall",
+    "entitlements",
+    "storekit",
+    "play-billing",
+    "attribution"
   ],
   "scripts": {
     "verify": "npm run verify:ios && npm run verify:android && npm run verify:web",
@@ -45,7 +55,7 @@
     "eslint": "eslint . --ext ts",
     "prettier": "prettier \"**/*.{css,html,ts,js,java}\" --plugin=prettier-plugin-java",
     "swiftlint": "node-swiftlint",
-    "docgen": "docgen --api RevnixPlugin --output-readme README.md --output-json dist/docs.json",
+    "docgen": "docgen --api RevnixPlugin --output-readme docs/API.md --output-json dist/docs.json",
     "build": "npm run clean && npm run docgen && tsc && rollup -c rollup.config.mjs",
     "clean": "rimraf ./dist",
     "watch": "tsc --watch",

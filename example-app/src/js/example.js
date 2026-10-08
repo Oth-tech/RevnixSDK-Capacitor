@@ -45,3 +45,29 @@ window.testPlacement = async () => {
     log('placement failed [' + (err.code || '?') + ']: ' + err.message);
   }
 };
+
+window.testPurchase = async () => {
+  try {
+    const productId = document.getElementById('productId').value;
+    log('buying ' + productId + '…');
+    const { result } = await Revnix.purchase({ productId });
+    if (!result) {
+      log('purchase cancelled');
+      return;
+    }
+    await Revnix.waitForEntitlements({ seq: result.seq });
+    const { entitled } = await Revnix.isEntitled({ entitlementId: document.getElementById('entitlementId').value });
+    log('purchased ' + productId + ' · event ' + result.eventId + ' · seq ' + result.seq + (entitled ? ' · UNLOCKED' : ' · locked'));
+  } catch (err) {
+    log('purchase failed [' + (err.code || '?') + ']: ' + err.message);
+  }
+};
+
+window.testRestore = async () => {
+  try {
+    const { restored } = await Revnix.restore();
+    log('restored ' + restored + ' purchase(s)');
+  } catch (err) {
+    log('restore failed [' + (err.code || '?') + ']: ' + err.message);
+  }
+};
