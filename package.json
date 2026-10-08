@@ -86,6 +86,6 @@
     }
   },
   "dependencies": {
-    "revnix-react": "^1.4.0"
+    "react-native-revnix": "^1.4.0"
   }
 }

@@ -1,19 +1,3 @@
-# Release revnix-capacitor to npm.
-#
-# Dispatched by revnix-app's "Release SDKs" workflow on every merge to its
-# main (after revnix-react has released), and runnable by hand. One run = one
-# version. Beyond what the revnix-sdk release does, this one:
-#
-#   * moves the native submodules (ios/Revnix → RevnixSDK-iOS,
-#     android/revnix-kotlin → RevnixSDK-Android) to their upstream main, and
-#     records the move in the changelog. The npm tarball ships those sources
-#     (see `files` in package.json), so they are checked out throughout — with
-#     the release App's token, since both native repos are private;
-#   * follows revnix-react: the web implementation delegates to it, so the
-#     dependency is bumped to the version the caller just released (or the
-#     latest on npm when run by hand);
-#   * rebuilds, which regenerates the docgen blocks in README.md.
-
 name: Release
 run-name: "Release ${{ inputs.run_key || format('manual-{0}', github.run_id) }}"
 
@@ -29,8 +13,8 @@ on:
         description: "Exact next version (x.y.z, above the current one). Empty = bump."
         type: string
         default: ""
-      revnix_react_version:
-        description: "revnix-react version to depend on. Empty = latest on npm."
+      react_native_revnix_version:
+        description: "react-native-revnix version to depend on. Empty = latest on npm."
         type: string
         default: ""
       app_sha:
@@ -183,27 +167,27 @@ jobs:
           echo "ios=$IOS_AFTER" >> "$GITHUB_OUTPUT"
           echo "android=$ANDROID_AFTER" >> "$GITHUB_OUTPUT"
 
-      - name: Follow revnix-react
+      - name: Follow react-native-revnix
         if: steps.pending.outputs.pending != 'true'
         id: react
         env:
-          WANT: ${{ inputs.revnix_react_version }}
+          WANT: ${{ inputs.react_native_revnix_version }}
         run: |
-          if [ -z "$WANT" ]; then WANT=$(npm view revnix-react version); fi
+          if [ -z "$WANT" ]; then WANT=$(npm view react-native-revnix version); fi
           for _ in $(seq 1 40); do
-            [ -n "$(npm view --prefer-online "revnix-react@$WANT" version 2>/dev/null)" ] && break
-            echo "revnix-react@$WANT is not on npm yet; waiting."
+            [ -n "$(npm view --prefer-online "react-native-revnix@$WANT" version 2>/dev/null)" ] && break
+            echo "react-native-revnix@$WANT is not on npm yet; waiting."
             sleep 15
           done
-          HAVE_RANGE=$(node -p "require('./package.json').dependencies['revnix-react']")
+          HAVE_RANGE=$(node -p "require('./package.json').dependencies['react-native-revnix']")
           HAVE=${HAVE_RANGE#^}
           NOTE=""
           if [ "$WANT" != "$HAVE" ] && [ "$(printf '%s\n%s\n' "$HAVE" "$WANT" | sort -V | tail -1)" = "$WANT" ]; then
-            npm install "revnix-react@^$WANT" --save
-            NOTE="Web: revnix-react $HAVE_RANGE → ^$WANT."
+            npm install "react-native-revnix@^$WANT" --save
+            NOTE="Web: react-native-revnix $HAVE_RANGE → ^$WANT."
             echo "$NOTE"
           else
-            echo "revnix-react already at $HAVE_RANGE; not moving to $WANT."
+            echo "react-native-revnix already at $HAVE_RANGE; not moving to $WANT."
           fi
           echo "note=$NOTE" >> "$GITHUB_OUTPUT"
 

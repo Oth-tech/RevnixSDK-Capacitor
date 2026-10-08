@@ -61,9 +61,9 @@ revnix-app's `main` dispatches this repo's `Release` workflow
 
 1. builds and tests `main`;
 2. moves the native submodules to their upstream `main` and bumps the
-   `revnix-react` dependency to the version just released;
+   `react-native-revnix` dependency to the version just released;
 3. releases only when something changed: the code moved since the last
-   release, the native submodules moved, or `revnix-react` was bumped —
+   release, the native submodules moved, or `react-native-revnix` was bumped —
    otherwise the run is skipped (no bump, PR, publish, tag, or release), by
    decision (2026-10-01);
 4. when releasing, reads `## Unreleased` in `CHANGELOG.md` to pick the bump —
@@ -79,7 +79,7 @@ revnix-app's `main` dispatches this repo's `Release` workflow
 
 So the only thing a change needs is a bullet under the right `###` heading in
 `## Unreleased`. Run it by hand from the Actions tab (`bump` and
-`revnix_react_version` can be forced; forcing a bump always releases).
+`react_native_revnix_version` can be forced; forcing a bump always releases).
 
 One-time setup (an npm owner): on npmjs.com, package `revnix-capacitor` →
 Settings → Trusted Publisher → GitHub Actions, organisation `Oth-tech`,

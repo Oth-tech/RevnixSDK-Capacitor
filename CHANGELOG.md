@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Web: depends on `react-native-revnix` (the renamed `revnix-react`).
+
 ## 1.4.1 (2026-10-07)
 
 ### Changed

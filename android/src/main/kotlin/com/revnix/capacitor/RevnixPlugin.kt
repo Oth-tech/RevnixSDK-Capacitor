@@ -90,7 +90,7 @@ class RevnixPlugin : Plugin() {
                     .overriddenBy(deviceOverrides(call.getObject("device"))),
                 // REV-272: JS opts in explicitly — the plugin always has a
                 // handler to give (the event emitter), so "is there a handler"
-                // cannot be the signal the way it is in revnix-react.
+                // cannot be the signal the way it is in react-native-revnix.
                 onImplicitPaywall = { trigger ->
                     // retainUntilConsumed: the launch moments fire during
                     // configure(), which a JS app typically calls BEFORE
