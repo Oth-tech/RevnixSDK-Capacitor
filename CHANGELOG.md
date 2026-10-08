@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.5.0 (2026-10-08)
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS b5e0fc9 → 08c0165, RevnixSDK-Android b79a791 → ebb1856.
+- Web: react-native-revnix ^1.4.2 → ^1.5.0.
+
 ## 1.4.2 (2026-10-08)
 
 ### Changed
