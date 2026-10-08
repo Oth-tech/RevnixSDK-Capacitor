@@ -388,7 +388,7 @@ export interface RevnixPlugin {
 
   /** Drain the persistent retry queue. Safe on every launch/foreground;
    *  the server dedupes on the purchase key. (Web reports `delivered: 0`;
-   *  revnix-react drains internally without a count.) */
+   *  react-native-revnix drains internally without a count.) */
   retryPendingPurchases(): Promise<{ delivered: number }>;
 
   /** How many registrations are still queued. (Web always reports 0.) */

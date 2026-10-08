@@ -1,15 +1,3 @@
-// REV-272: implicit placements, Capacitor side.
-//
-// Runs against the COMPILED web implementation (dist/esm) — the published
-// artifact is what an app actually loads. The web build delegates to
-// revnix-react, so what this file owns is the BRIDGE: the option that turns the
-// feature on, the event the plugin emits, and the deep-link passthrough.
-//
-// The gate matters most. The plugin always has a handler to give (its own event
-// emitter), so revnix-react's "is a handler present" signal cannot be used —
-// without the explicit option every Capacitor web app in the fleet would start
-// asking /v1/config on every launch.
-
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
 

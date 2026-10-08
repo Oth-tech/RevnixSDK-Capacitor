@@ -1,13 +1,3 @@
-// renderRevnixPaywall — renders a published PaywallConfig exactly as the
-// dashboard paywall-builder previews it. Framework-free DOM port of the React
-// Native renderer in revnix-react (src/ui/RevnixPaywall.tsx) — that file and
-// PaywallPhonePreview.tsx in revnix-app are the reference renderers; keep the
-// three in lockstep (every layout, block, and style value here mirrors the
-// same-named block there, RN dp values carried over 1:1 as CSS px). The config
-// decides template, copy, accent, badge, highlight, and hero image; the app
-// supplies package titles/prices (from StoreKit / Play Billing) and the
-// purchase handlers, so the display never disagrees with the charge.
-//
 // `template` is a LAYOUT id. "focus" | "feature-list" | "minimal" are the
 // original three and render byte-identically to the other SDKs' renderers;
 // the newer layouts (hero, timeline, plans, feature-grid, offer, reveal) are

@@ -4,7 +4,7 @@
 
 - **iOS** bridges [`revnix-swift`](https://github.com/Oth-tech/RevnixSDK-iOS) (StoreKit 2)
 - **Android** bridges [`revnix-kotlin`](https://github.com/Oth-tech/RevnixSDK-Android) (Play Billing 8)
-- **Web** delegates to [`revnix-react`](https://www.npmjs.com/package/revnix-react), the canonical TypeScript implementation of the resilience policy
+- **Web** delegates to [`react-native-revnix`](https://www.npmjs.com/package/react-native-revnix), the canonical TypeScript implementation of the resilience policy
 
 > The native SDKs are not on CocoaPods / Maven Central yet, so this plugin
 > carries them as **git submodules** (`ios/Revnix`, `android/revnix-kotlin`)
@@ -274,7 +274,7 @@ PushNotifications.addListener('registration', (token) => {
 });
 ```
 
-No-op on web (falls through to `revnix-react`, which has no device push
+No-op on web (falls through to `react-native-revnix`, which has no device push
 token to collect). Requires the app's own push setup: Firebase Cloud
 Messaging on Android, Push Notifications + Background Modes → Remote
 notifications on iOS; no notification permission needed, the probe is
@@ -342,7 +342,7 @@ rate_limited · server · bad_response · auth · not_found · purchase_blocked
 · invalid) and `data.isRetryable`. Deliberate rejections (401/403/404/409)
 are never masked by a cache: a kill-switch must stay a kill-switch. That
 taxonomy is the native (iOS/Android) bridges only: on web, rejections are
-revnix-react's `RevnixError` classes instead, read `status` and
+react-native-revnix's `RevnixError` classes instead, read `status` and
 `isRetryable` (no `code`).
 
 <docgen-api>
@@ -489,7 +489,7 @@ retryPendingPurchases() => Promise<{ delivered: number; }>
 
 Drain the persistent retry queue. Safe on every launch/foreground;
 the server dedupes on the purchase key. (Web reports `delivered: 0`;
-revnix-react drains internally without a count.)
+react-native-revnix drains internally without a count.)
 
 **Returns:** <code>Promise&lt;{ delivered: number; }&gt;</code>
 

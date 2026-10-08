@@ -1,5 +1,5 @@
 import { WebPlugin } from '@capacitor/core';
-import { RevnixClient } from 'revnix-react';
+import { RevnixClient } from 'react-native-revnix';
 
 import type {
   ConfigureOptions,
@@ -15,7 +15,7 @@ import type {
 } from './definitions';
 
 /**
- * Web implementation — delegates to `revnix-react`, the CANONICAL TypeScript
+ * Web implementation — delegates to `react-native-revnix`, the CANONICAL TypeScript
  * implementation of the Revnix resilience policy (its `resilience.test.ts`
  * is the behavioral spec every port follows). Nothing is reimplemented here;
  * a Capacitor app running as a plain website gets exactly the client a React
@@ -51,10 +51,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
       },
       reportInstalls: true,
       installMetadata: { platform: 'web' },
-      // REV-268: revnix-react detects what a browser exposes (platform, OS
+      // REV-268: react-native-revnix detects what a browser exposes (platform, OS
       // version, locale); the app's overrides win.
       device: options.device,
-      // REV-272: implicit placements. revnix-react turns them on when a
+      // REV-272: implicit placements. react-native-revnix turns them on when a
       // handler is present, so the web build gates on the OPTION instead —
       // this plugin always has a handler to give (the event emitter), and
       // without the option every Capacitor web app would start firing.
@@ -117,13 +117,13 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   }
 
   async retryPendingPurchases(): Promise<{ delivered: number }> {
-    // revnix-react drains internally without reporting a count.
+    // react-native-revnix drains internally without reporting a count.
     await this.require().retryPendingPurchases();
     return { delivered: 0 };
   }
 
   async pendingPurchaseCount(): Promise<{ count: number }> {
-    // The queue is internal to revnix-react on web; no inspection API yet.
+    // The queue is internal to react-native-revnix on web; no inspection API yet.
     return { count: 0 };
   }
 
@@ -134,7 +134,7 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     this.require().handleDeepLink(options.url);
   }
 
-  // ponytail: revnix-react 1.1.2 lacks resolveDeepLink; switch to this.require().resolveDeepLink() once it ships.
+  // ponytail: hand-rolled; react-native-revnix now ships resolveDeepLink, switch to this.require().resolveDeepLink().
   async resolveDeepLink(options: { url: string }): Promise<{ url: string }> {
     const credentials = this.credentials;
     if (!credentials) throw new Error('Revnix.configure() must be called first');
@@ -154,7 +154,7 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     }
   }
 
-  // ponytail: revnix-react 1.1.2 lacks getLastDeepLink; switch to this.require().getLastDeepLink() once it ships.
+  // ponytail: stub; react-native-revnix now ships getLastDeepLink, switch to this.require().getLastDeepLink().
   async getLastDeepLink(): Promise<{ lastDeepLink: LastDeepLink | null }> {
     return { lastDeepLink: null };
   }
@@ -167,7 +167,7 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
 
   async resolvePlacement(options: { placementKey: string }): Promise<PlacementResolution> {
     // Wire-identical shapes (this plugin's PlacementPaywall/PaywallConfig
-    // mirror revnix-react's); revnix-react uses null where this plugin's
+    // mirror react-native-revnix's); react-native-revnix uses null where this plugin's
     // definitions use undefined, matching the native bridges which omit the
     // key entirely. `experiment` passes through untouched, normalized to
     // null when an older server omits the key (REV-219).
@@ -180,7 +180,7 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   }
 
   async registerInstall(): Promise<void> {
-    // Handled by configure() via revnix-react's reportInstalls.
+    // Handled by configure() via react-native-revnix's reportInstalls.
   }
 
   async updateSkanConversionValue(): Promise<void> {
