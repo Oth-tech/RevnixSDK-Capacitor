@@ -192,6 +192,10 @@ export interface RegisterPurchaseInput {
   signedTransactionInfo?: string;
 }
 
+export interface PurchaseOptions {
+  productId: string;
+}
+
 export interface RegisterPurchaseResult {
   eventId: string;
   /** Ledger position; pass to waitForEntitlements to unlock. */
@@ -385,6 +389,24 @@ export interface RevnixPlugin {
   /** Register a store purchase. On a transient failure the claim is queued
    *  durably and the call rejects; it is never lost. */
   registerPurchase(options: RegisterPurchaseInput): Promise<RegisterPurchaseResult>;
+
+  /** Buy a product through StoreKit 2 (iOS) or Google Play Billing (Android):
+   *  opens the store sheet, registers the purchase with Revnix (store proof
+   *  attached), finishes the transaction and returns the registration. Resolves
+   *  `{ result: null }` only when the customer cancels or the purchase is
+   *  pending (Ask to Buy, cash). When the store charged but registration
+   *  failed it rejects with the same error `registerPurchase` would: retryable
+   *  means the claim is queued durably and the transaction finished,
+   *  non-retryable (e.g. `purchase_blocked`) leaves it unfinished. Rejects
+   *  `product_not_found` when the store has no such product and `store_error`
+   *  for other store failures (`isRetryable` only for transient ones). Web
+   *  rejects: purchases are mobile only. */
+  purchase(options: PurchaseOptions): Promise<{ result: RegisterPurchaseResult | null }>;
+
+  /** Re-register everything the device owns (iOS syncs with the App Store
+   *  first). The server dedupes. Resolves the number of claims delivered or
+   *  durably queued. */
+  restore(): Promise<{ restored: number }>;
 
   /** Drain the persistent retry queue. Safe on every launch/foreground;
    *  the server dedupes on the purchase key. (Web reports `delivered: 0`;

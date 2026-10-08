@@ -116,6 +116,14 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     return (await this.require().registerPurchase(options)) as RegisterPurchaseResult;
   }
 
+  async purchase(): Promise<{ result: RegisterPurchaseResult | null }> {
+    throw new Error('Revnix.purchase() is mobile only: on web, register purchases from your server with registerPurchase()');
+  }
+
+  async restore(): Promise<{ restored: number }> {
+    throw new Error('Revnix.restore() is mobile only');
+  }
+
   async retryPendingPurchases(): Promise<{ delivered: number }> {
     // react-native-revnix drains internally without reporting a count.
     await this.require().retryPendingPurchases();

@@ -21,8 +21,10 @@ import com.revnix.REVNIX_DEFAULT_SESSION_TIMEOUT_MS
 import com.revnix.android.AndroidDeviceFacts
 import com.revnix.android.AndroidLifecycle
 import com.revnix.android.AndroidStorage
+import com.revnix.android.BillingException
 import com.revnix.android.PlayBillingConnector
 import com.revnix.android.PlayInstallReferrer
+import com.revnix.android.ProductNotFoundException
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -257,6 +259,39 @@ class RevnixPlugin : Plugin() {
         scope.launch {
             try {
                 call.resolve(js(active.registerPurchase(input)))
+            } catch (err: Throwable) {
+                reject(call, err)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun purchase(call: PluginCall) {
+        requireClient(call) ?: return
+        val productId = call.getString("productId") ?: return call.reject("productId is required", "invalid")
+        val connector = billing ?: return call.reject("Revnix.configure() must be called first", "invalid")
+        val foreground = activity ?: return call.reject("No foreground activity", "no_activity")
+        scope.launch {
+            try {
+                val result = connector.purchase(foreground, productId)
+                call.resolve(JSObject().put("result", result?.let { js(it) } ?: JSONObject.NULL))
+            } catch (err: ProductNotFoundException) {
+                call.reject(err.message, "product_not_found", null, JSObject().put("isRetryable", false))
+            } catch (err: BillingException) {
+                call.reject(err.message, "store_error", null, JSObject().put("isRetryable", err.isRetryable))
+            } catch (err: Throwable) {
+                reject(call, err)
+            }
+        }
+    }
+
+    @PluginMethod
+    fun restore(call: PluginCall) {
+        requireClient(call) ?: return
+        val connector = billing ?: return call.reject("Revnix.configure() must be called first", "invalid")
+        scope.launch {
+            try {
+                call.resolve(JSObject().put("restored", connector.restore()))
             } catch (err: Throwable) {
                 reject(call, err)
             }
