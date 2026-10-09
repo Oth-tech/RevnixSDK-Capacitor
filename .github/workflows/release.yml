@@ -157,7 +157,8 @@ jobs:
           IOS_AFTER=$(git -C ios/Revnix rev-parse HEAD)
           ANDROID_AFTER=$(git -C android/revnix-kotlin rev-parse HEAD)
           NOTE=""
-          if [ "$IOS_BEFORE" != "$IOS_AFTER" ] || [ "$ANDROID_BEFORE" != "$ANDROID_AFTER" ]; then
+          moved() { ! git -C "$1" diff --quiet "$2" "$3" -- Sources Package.swift '*/src'; }
+          if moved ios/Revnix "$IOS_BEFORE" "$IOS_AFTER" || moved android/revnix-kotlin "$ANDROID_BEFORE" "$ANDROID_AFTER"; then
             NOTE="Native SDKs: RevnixSDK-iOS ${IOS_BEFORE:0:7} → ${IOS_AFTER:0:7}, RevnixSDK-Android ${ANDROID_BEFORE:0:7} → ${ANDROID_AFTER:0:7}."
             echo "$NOTE"
           else
