@@ -25,6 +25,7 @@ import com.revnix.android.BillingException
 import com.revnix.android.PlayBillingConnector
 import com.revnix.android.PlayInstallReferrer
 import com.revnix.android.ProductNotFoundException
+import com.revnix.android.ui.preload
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -546,6 +547,29 @@ class RevnixPlugin : Plugin() {
         val eventId = call.getString("eventId")
         scope.launch {
             active.track(event, properties, eventId)
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun flushEvents(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        scope.launch {
+            active.flushEvents()
+            call.resolve()
+        }
+    }
+
+    @PluginMethod
+    fun preload(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val keys = call.getArray("placementKeys")?.toList<Any?>()?.filterIsInstance<String>()
+        if (keys == null) {
+            call.reject("placementKeys is required", "invalid")
+            return
+        }
+        scope.launch {
+            active.preload(context, keys)
             call.resolve()
         }
     }

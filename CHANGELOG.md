@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- `flushEvents()` and `preload({ placementKeys })`.
+
+### Changed
+
+- Events are now batched and persisted, and placements resolve cache-first, via the 1.6.0 native SDKs.
+
 ## 1.5.0 (2026-10-08)
 
 ### Changed

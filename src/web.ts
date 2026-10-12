@@ -250,6 +250,14 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     });
   }
 
+  async flushEvents(): Promise<void> {
+    this.require();
+  }
+
+  async preload(): Promise<void> {
+    this.require();
+  }
+
   async setAttribution(options: {
     provider: MmpProvider;
     network: string;
