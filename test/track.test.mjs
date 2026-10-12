@@ -8,4 +8,10 @@ describe('MS8 custom events (Capacitor web)', () => {
     const web = new RevnixWeb();
     await assert.rejects(() => web.track({ event: 'level_up' }), /configure/);
   });
+
+  test('flushEvents and preload reject before configure', async () => {
+    const web = new RevnixWeb();
+    await assert.rejects(() => web.flushEvents(), /configure/);
+    await assert.rejects(() => web.preload({ placementKeys: ['a'] }), /configure/);
+  });
 });

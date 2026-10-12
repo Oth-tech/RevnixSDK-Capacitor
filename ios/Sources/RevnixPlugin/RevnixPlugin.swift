@@ -39,6 +39,8 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "logPaywallEvent", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logAdRevenue", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "track", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "flushEvents", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "preload", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setAttribution", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setPushToken", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestTrackingAuthorization", returnType: CAPPluginReturnPromise),
@@ -534,6 +536,26 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         let eventId = call.getString("eventId")
         Task {
             await client.track(event, properties: properties, eventId: eventId)
+            call.resolve()
+        }
+    }
+
+    @objc func flushEvents(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        Task {
+            await client.flushEvents()
+            call.resolve()
+        }
+    }
+
+    @objc func preload(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let keys = call.getArray("placementKeys", String.self) else {
+            call.reject("placementKeys is required", "invalid")
+            return
+        }
+        Task {
+            await client.preload(keys)
             call.resolve()
         }
     }

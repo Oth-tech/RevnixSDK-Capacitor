@@ -20,6 +20,8 @@
 * [`logPaywallEvent(...)`](#logpaywallevent)
 * [`logAdRevenue(...)`](#logadrevenue)
 * [`track(...)`](#track)
+* [`flushEvents()`](#flushevents)
+* [`preload(...)`](#preload)
 * [`setAttribution(...)`](#setattribution)
 * [`setPushToken(...)`](#setpushtoken)
 * [`requestTrackingAuthorization()`](#requesttrackingauthorization)
@@ -406,6 +408,35 @@ on `registerPurchase`. `event` must match `^[a-z0-9_]{1,64}$`.
 | Param         | Type                                                                                                                                    |
 | ------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
 | **`options`** | <code>{ event: string; properties?: <a href="#record">Record</a>&lt;string, string \| number \| boolean&gt;; eventId?: string; }</code> |
+
+--------------------
+
+
+### flushEvents()
+
+```typescript
+flushEvents() => Promise<void>
+```
+
+Send every queued event now instead of waiting for the next batch.
+Events are batched and persisted, so a flush is only needed before
+something that may kill the process. (Web: no-op.)
+
+--------------------
+
+
+### preload(...)
+
+```typescript
+preload(options: { placementKeys: string[]; }) => Promise<void>
+```
+
+Warm the placement cache (and, on Android, paywall images) so the next
+`resolvePlacement` is instant. Failures are swallowed. (Web: no-op.)
+
+| Param         | Type                                      |
+| ------------- | ----------------------------------------- |
+| **`options`** | <code>{ placementKeys: string[]; }</code> |
 
 --------------------
 

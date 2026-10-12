@@ -520,6 +520,15 @@ export interface RevnixPlugin {
     eventId?: string;
   }): Promise<void>;
 
+  /** Send every queued event now instead of waiting for the next batch.
+   *  Events are batched and persisted, so a flush is only needed before
+   *  something that may kill the process. (Web: no-op.) */
+  flushEvents(): Promise<void>;
+
+  /** Warm the placement cache (and, on Android, paywall images) so the next
+   *  `resolvePlacement` is instant. Failures are swallowed. (Web: no-op.) */
+  preload(options: { placementKeys: string[] }): Promise<void>;
+
   /** PT11: hand the SDK an attribution verdict your MMP (Adjust, AppsFlyer,
    *  …) already reached, from that MMP's own callback. Fire-and-forget like
    *  the other beacons. */
