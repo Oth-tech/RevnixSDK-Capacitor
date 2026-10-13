@@ -36,6 +36,9 @@ export type {
   ProductsBlock,
   SpacerBlock,
   TextBlock,
+  TimerBlock,
+  ToggleBlock,
+  VideoBlock,
 } from './blocks';
 export {
   asBlockDoc,

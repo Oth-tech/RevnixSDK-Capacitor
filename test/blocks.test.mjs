@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import { before, describe, test } from 'node:test';
 import { JSDOM } from 'jsdom';
 
-const { asBlockDoc, renderBlockDoc, resolveTags, minorUnitsForCurrency } = await import('../dist/esm/blocks.js');
+const { asBlockDoc, renderBlockDoc, resolveTags, minorUnitsForCurrency, formatCountdown, timerDeadline } =
+  await import('../dist/esm/blocks.js');
 
 let document;
 before(() => {
@@ -108,7 +109,7 @@ describe('an app cannot be patched, so nothing may crash the screen', () => {
 
   test('an unknown container layout falls back to a column instead of vanishing', () => {
     const screen = render([
-      { id: 'c', type: 'card', layout: 'carousel', children: [{ id: 'k', type: 'text', text: 'kept' }] },
+      { id: 'c', type: 'card', layout: 'hologram', children: [{ id: 'k', type: 'text', text: 'kept' }] },
     ]);
     assert.match(screen.textContent, /kept/);
     assert.equal(screen.firstChild.firstChild.style.flexDirection, 'column');
@@ -553,6 +554,24 @@ describe('close affordance', () => {
     assert.equal(button.style.background, 'transparent');
   });
 
+  test('a close on a carousel page does not suppress the fallback', () => {
+    const screen = render(
+      [
+        {
+          id: 'c',
+          type: 'card',
+          layout: 'carousel',
+          children: [
+            { id: 'p1', type: 'text', text: 'one' },
+            { id: 'x', type: 'text', text: '\u00d7', action: 'close' },
+          ],
+        },
+      ],
+      { onClose: () => {} },
+    );
+    assert.ok(fallbackOf(screen), 'a close on a later page is invisible until a swipe');
+  });
+
   test('a close inside a conditional card does not suppress the fallback', () => {
     // A `repeat` card renders once per package (none, on an empty offering)
     // and a `packageIndex` card is hidden when the offering does not reach
@@ -579,5 +598,174 @@ describe('close affordance', () => {
       { onClose: () => {} },
     );
     assert.ok(fallbackOf(screen), 'an unknown action must not suppress the fallback');
+  });
+});
+
+describe('timer, video, toggle and carousel', () => {
+  const click = (node) => node.dispatchEvent(new document.defaultView.MouseEvent('click', { bubbles: true }));
+  const one = (blocks, extra) => render(blocks, extra).firstChild.firstChild;
+
+  test('countdown tokens format per the contract', () => {
+    assert.equal(formatCountdown('{hh}:{mm}:{ss}', 3725), '01:02:05');
+    assert.equal(formatCountdown('{d}d {hh}:{mm}:{ss}', 90061), '1d 01:01:01');
+    assert.equal(formatCountdown('{hh}:{mm}', 90061), '25:01');
+    assert.equal(formatCountdown('{mm}:{ss}', 5400), '90:00');
+    assert.equal(formatCountdown('{mm}:{ss}', 7200), '120:00');
+    assert.equal(formatCountdown('{ss}s', 125), '125s');
+    assert.equal(formatCountdown('{ss}{ss}', -4), '0000');
+  });
+
+  test('a duration counts from the display, an unparseable endsAt is already past', () => {
+    assert.equal(timerDeadline({ duration: 60 }, 1000), 61000);
+    assert.equal(timerDeadline({ endsAt: '2026-10-31T23:59:59Z' }, 0), Date.parse('2026-10-31T23:59:59Z'));
+    assert.equal(timerDeadline({ endsAt: 'soon' }, 0), 0);
+  });
+
+  test('a timer draws like text, with no tag resolution', () => {
+    const node = one(
+      [{ id: 't', type: 'timer', duration: 600, format: '{price} {mm}:{ss}', style: { fontSize: 15 } }],
+      { shownAt: Date.now() + 500 },
+    );
+    assert.equal(node.textContent, '{price} 10:00');
+    assert.equal(node.style.fontSize, '15px');
+  });
+
+  test('an expired timer draws expiredText, or nothing without it', () => {
+    const past = '2020-01-01T00:00:00Z';
+    assert.equal(
+      one([{ id: 't', type: 'timer', endsAt: past, expiredText: 'Offer expired' }]).textContent,
+      'Offer expired',
+    );
+    assert.equal(render([{ id: 't', type: 'timer', endsAt: past }]).firstChild.childNodes.length, 0);
+    assert.equal(render([{ id: 't', type: 'timer', endsAt: 'garbage' }]).firstChild.childNodes.length, 0);
+  });
+
+  test('a video is a muted looping inline clip sized like an image', () => {
+    const node = one([
+      {
+        id: 'v',
+        type: 'video',
+        url: 'https://cdn.example.com/a.mp4',
+        poster: 'https://cdn.example.com/a.jpg',
+        fit: 'contain',
+      },
+    ]);
+    assert.equal(node.style.height, '160px');
+    assert.equal(node.style.borderRadius, '16px');
+    const video = node.firstChild;
+    assert.equal(video.tagName, 'VIDEO');
+    assert.equal(video.muted, true);
+    for (const attr of ['muted', 'autoplay', 'loop', 'playsinline']) assert.ok(video.hasAttribute(attr), attr);
+    assert.equal(video.hasAttribute('controls'), false);
+    assert.equal(video.poster, 'https://cdn.example.com/a.jpg');
+    assert.equal(video.style.objectFit, 'contain');
+    const sized = one([{ id: 'v', type: 'video', url: 'https://x/a.mp4', style: { height: 220, radius: 12 } }]);
+    assert.equal(sized.style.height, '220px');
+    assert.equal(sized.style.borderRadius, '12px');
+  });
+
+  const TOGGLE = { id: 'g', type: 'toggle', label: 'Trial for {price}', onPackageIndex: 1, offPackageIndex: 0 };
+
+  const mounted = (blocks, extra) => {
+    const screen = render(blocks, extra);
+    document.body.replaceChildren(screen);
+    return screen;
+  };
+
+  test('a toggle is ON while its trial package is selected, and tapping selects the other', () => {
+    const picked = [];
+    const off = mounted([TOGGLE], { onSelect: (id) => picked.push(id) }).firstChild.firstChild;
+    const input = off.querySelector('input');
+    assert.equal(input.getAttribute('role'), 'switch');
+    assert.equal(input.checked, false);
+    assert.equal(off.textContent, 'Trial for $59.99');
+    click(off.firstChild);
+    assert.deepEqual(picked, ['monthly']);
+
+    const on = mounted([TOGGLE], { highlightPackageId: 'monthly', onSelect: (id) => picked.push(id) }).firstChild
+      .firstChild;
+    assert.equal(on.querySelector('input').checked, true);
+    click(on.querySelector('input'));
+    assert.deepEqual(picked, ['monthly', 'annual']);
+  });
+
+  test('a toggle inside a plan card does not also select that card', () => {
+    const picked = [];
+    const screen = mounted([{ id: 'c', type: 'card', packageIndex: 0, children: [TOGGLE] }], {
+      highlightPackageId: 'monthly',
+      onSelect: (id) => picked.push(id),
+    });
+    click(screen.querySelector('input'));
+    assert.deepEqual(picked, ['annual']);
+    document.body.replaceChildren();
+  });
+
+  test('a toggle naming a package outside the offering is not drawn', () => {
+    assert.equal(render([{ ...TOGGLE, onPackageIndex: 5 }]).firstChild.childNodes.length, 0);
+  });
+
+  test('a carousel pages its children with dots', () => {
+    const node = one([
+      {
+        id: 'c',
+        type: 'card',
+        layout: 'carousel',
+        autoAdvance: 1,
+        children: [
+          { id: 'p1', type: 'text', text: 'one' },
+          { id: 'p2', type: 'text', text: 'two' },
+          { id: 'p3', type: 'text', text: 'three' },
+        ],
+      },
+    ]);
+    assert.equal(node.style.height, '220px');
+    const [track, dots] = node.childNodes;
+    assert.equal(track.style.overflowX, 'auto');
+    assert.equal(track.style.scrollSnapType, 'x mandatory');
+    assert.equal(track.childNodes.length, 3);
+    assert.equal(track.firstChild.style.flex, '0 0 100%');
+    assert.equal(dots.childNodes.length, 3);
+    assert.equal(dots.childNodes[0].style.background, 'rgb(100, 120, 255)');
+    assert.equal(dots.childNodes[1].style.background, 'rgba(245, 247, 250, 0.3)');
+  });
+
+  test('a carousel reports its page and comes back on it after a re-render', () => {
+    const carouselPages = new Map();
+    const blocks = [
+      {
+        id: 'c',
+        type: 'card',
+        layout: 'carousel',
+        children: [
+          { id: 'p1', type: 'text', text: 'one' },
+          { id: 'p2', type: 'text', text: 'two' },
+          { id: 'p3', type: 'text', text: 'three' },
+        ],
+      },
+    ];
+    const track = one(blocks, { carouselPages }).firstChild;
+    Object.defineProperty(track, 'clientWidth', { value: 300 });
+    Object.defineProperty(track, 'scrollLeft', { value: 600 });
+    track.dispatchEvent(new document.defaultView.Event('scroll'));
+    assert.equal(carouselPages.get('c'), 2);
+    const dots = one(blocks, { carouselPages }).childNodes[1].childNodes;
+    assert.equal(dots[2].style.background, 'rgb(100, 120, 255)');
+    assert.equal(dots[0].style.background, 'rgba(245, 247, 250, 0.3)');
+  });
+
+  test('a carousel takes a numeric height and draws no dots for one page', () => {
+    const node = one([
+      {
+        id: 'c',
+        type: 'card',
+        layout: 'carousel',
+        style: { height: 240 },
+        children: [{ id: 'p', type: 'text', text: 'x' }],
+      },
+    ]);
+    assert.equal(node.style.height, '240px');
+    assert.equal(node.childNodes.length, 1);
+    const relative = one([{ id: 'c', type: 'card', layout: 'carousel', style: { height: '50%' }, children: [] }]);
+    assert.equal(relative.style.height, '220px');
   });
 });

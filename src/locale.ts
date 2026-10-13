@@ -125,6 +125,14 @@ function localizeBlock(
         highlightSub: opt('highlightSub', block.highlightSub),
         badgeText: opt('badgeText', block.badgeText),
       };
+    case 'timer':
+      return {
+        ...block,
+        format: opt('format', block.format),
+        expiredText: opt('expiredText', block.expiredText),
+      };
+    case 'toggle':
+      return { ...block, label: at('label', block.label) };
     case 'card':
       return { ...block, children: block.children.map((c) => localizeBlock(c, lookup)) };
     default:

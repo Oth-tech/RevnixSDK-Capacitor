@@ -185,12 +185,45 @@ export interface SpacerBlock extends BlockBase {
   flex?: boolean;
 }
 
+/** Countdown text. `endsAt` is one deadline for everyone; `duration` (seconds)
+ *  counts from the moment this paywall view was first displayed. At zero it
+ *  draws `expiredText`, or nothing when that is absent. Tokens in `format`:
+ *  {d} {hh} {mm} {ss}. */
+export interface TimerBlock extends BlockBase {
+  type: 'timer';
+  endsAt?: string;
+  duration?: number;
+  format?: string;
+  expiredText?: string;
+}
+
+/** A muted clip that autoplays and loops, sized like an image block. */
+export interface VideoBlock extends BlockBase {
+  type: 'video';
+  url: string;
+  poster?: string;
+  fit?: 'cover' | 'contain';
+}
+
+/** The free-trial switch: ON while package `onPackageIndex` is selected, and
+ *  tapping it selects the other one. Not drawn when the offering reaches
+ *  neither index. */
+export interface ToggleBlock extends BlockBase {
+  type: 'toggle';
+  label: string;
+  onPackageIndex: number;
+  offPackageIndex: number;
+}
+
 /** The one container block. `layout` picks how children are placed: column /
  *  row are flex lines, `stack` layers them (children position with
- *  style.inset or the edge offsets), and `grid` is an N-column grid. */
+ *  style.inset or the edge offsets), `grid` is an N-column grid, and
+ *  `carousel` pages its children horizontally. */
 export interface CardBlock extends BlockBase {
   type: 'card';
-  layout?: 'column' | 'row' | 'stack' | 'grid';
+  layout?: 'column' | 'row' | 'stack' | 'grid' | 'carousel';
+  /** Carousel only: seconds per page before it moves on by itself. */
+  autoAdvance?: number;
   repeat?: 'packages';
   packageIndex?: number;
   columns?: number;
@@ -207,6 +240,9 @@ export type PaywallBlock =
   | LinksBlock
   | LineBlock
   | SpacerBlock
+  | TimerBlock
+  | VideoBlock
+  | ToggleBlock
   | CardBlock;
 
 export interface PaywallBlockDoc {
@@ -724,6 +760,30 @@ function withFallback(tpl: string, pkg: BlockPackage, all: BlockPackage[], fallb
   return out.trim() === '' ? fallback : out;
 }
 
+/** The countdown string for `remaining` whole seconds: {d} {hh} {mm} {ss},
+ *  hh/mm/ss zero-padded. Each token is the remainder of the next larger unit
+ *  the format also contains, so "{mm}:{ss}" at 90 minutes reads "90:00". */
+export function formatCountdown(format: string, remaining: number): string {
+  const r = Math.max(0, Math.floor(remaining));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const has = (token: string) => format.includes(`{${token}}`);
+  const values: Record<string, string> = {
+    d: String(Math.floor(r / 86400)),
+    hh: pad(Math.floor((has('d') ? r % 86400 : r) / 3600)),
+    mm: pad(Math.floor((has('hh') ? r % 3600 : has('d') ? r % 86400 : r) / 60)),
+    ss: pad(has('mm') ? r % 60 : has('hh') ? r % 3600 : has('d') ? r % 86400 : r),
+  };
+  return format.replace(/\{(d|hh|mm|ss)\}/g, (_raw, name: string) => values[name]);
+}
+
+/** When a timer block reaches zero, in epoch ms. An unparseable `endsAt` is
+ *  already past. */
+export function timerDeadline(block: TimerBlock, shownAt: number): number {
+  if (typeof block.duration === 'number') return shownAt + block.duration * 1000;
+  const at = Date.parse(String(block.endsAt));
+  return Number.isNaN(at) ? 0 : at;
+}
+
 // ——— style ———
 
 const JUSTIFY: Record<string, string> = {
@@ -864,6 +924,12 @@ export interface BlockRenderContext {
    *  the design fits (render contract v2 §3). Omitted, the window's inner
    *  height stands in and nothing else is touched. */
   viewport?: HTMLElement;
+  /** When this paywall view was first displayed (epoch ms); a `duration`
+   *  timer counts from it. Omitted, render time stands in. */
+  shownAt?: number;
+  /** Each carousel's current page by block id, kept by the host so a
+   *  re-render (a plan or toggle tap) does not send it back to page 1. */
+  carouselPages?: Map<string, number>;
   /** Fills an image block that publishes no URL of its own. */
   heroImageUrl?: string;
   /** Paywall-level Terms/Privacy, used when a links block sets none. */
@@ -988,6 +1054,8 @@ function makeSelectable(node: HTMLElement, ctx: BlockRenderContext, packageId: s
 const BLOCK_STYLE_ID = 'rvx-block-styles';
 const BUTTON_CLASS = 'rvx-block-button';
 const SPINNER_CLASS = 'rvx-block-spinner';
+const SWITCH_CLASS = 'rvx-block-switch';
+const CAROUSEL_CLASS = 'rvx-block-carousel';
 
 /** The handful of rules inline styles cannot express: the pressed state of a
  *  button (`:active`, so it works for touch as well as a pointer and needs no
@@ -997,6 +1065,13 @@ const BLOCK_CSS = `
 .${BUTTON_CLASS}[disabled] { cursor: default; }
 .${SPINNER_CLASS} { animation: rvx-block-spin 0.8s linear infinite; }
 @keyframes rvx-block-spin { to { transform: rotate(360deg); } }
+.${CAROUSEL_CLASS} { scrollbar-width: none; }
+.${CAROUSEL_CLASS}::-webkit-scrollbar { display: none; }
+.${SWITCH_CLASS} { -webkit-appearance: none; appearance: none; position: relative; flex-shrink: 0; margin: 0; width: 44px; height: 26px; border-radius: 13px; background: rgba(128,128,128,0.45); cursor: pointer; transition: background 0.2s; }
+.${SWITCH_CLASS}::before { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.2s; }
+.${SWITCH_CLASS}:checked { background: var(--rvx-accent); }
+.${SWITCH_CLASS}:checked::before { transform: translateX(18px); }
+.${SWITCH_CLASS}:focus-visible { outline: 2px solid var(--rvx-accent); outline-offset: 2px; }
 `;
 
 export function ensureBlockStyles(document: Document): void {
@@ -1045,7 +1120,7 @@ export function hasCloseAction(blocks: PaywallBlock[]): boolean {
   return blocks.some((b) => {
     if (typeof b !== 'object' || b === null || b.visibility !== undefined) return false;
     return b.type === 'card'
-      ? b.repeat === undefined && b.packageIndex === undefined && hasCloseAction(b.children)
+      ? b.repeat === undefined && b.packageIndex === undefined && b.layout !== 'carousel' && hasCloseAction(b.children)
       : (b.type === 'text' || b.type === 'image' || b.type === 'button') && b.action === 'close';
   });
 }
@@ -1057,6 +1132,38 @@ function div(doc: Document, tag = 'div'): HTMLElement {
 /** A plain container div, typed as one — the renderer's own root. */
 function box(doc: Document): HTMLDivElement {
   return doc.createElement('div');
+}
+
+function textBox(document: Document, style: BlockStyle | undefined, ctx: BlockRenderContext): HTMLElement {
+  const node = div(document);
+  if (style?.items !== undefined || style?.justify !== undefined) node.style.display = 'flex';
+  applyBlockStyle(node, style, ctx.doc, ctx.onDiagnostic);
+  return node;
+}
+
+function mediaFrame(node: HTMLElement, s: BlockStyle | undefined, circle: boolean): void {
+  const sized =
+    s !== undefined &&
+    (Boolean(s.inset) ||
+      s.height !== undefined ||
+      s.aspectRatio !== undefined ||
+      (s.top !== undefined && s.bottom !== undefined) ||
+      s.flex !== undefined);
+  if (!sized) node.style.height = '160px';
+  if (s?.inset) {
+    node.style.width = '100%';
+    node.style.height = '100%';
+  }
+  node.style.borderRadius = circle ? '50%' : sized ? '0' : '16px';
+  node.style.overflow = 'hidden';
+  node.style.flexShrink = '0';
+}
+
+// ponytail: self-clears once the node leaves the document (re-render or destroy); a tree mounted more than one tick after render freezes, add an explicit disposer if hosts render off-document.
+function whileShown(node: HTMLElement, ms: number, tick: () => boolean): void {
+  const id = setInterval(() => {
+    if (!node.isConnected || !tick()) clearInterval(id);
+  }, ms);
 }
 
 /**
@@ -1104,13 +1211,7 @@ function renderBlockIn(
 
   switch (block.type) {
     case 'text': {
-      const node = div(document);
-      const s = style;
-      // A text block that asks for cross/main-axis alignment (the ×-close
-      // chip, centered badges) is a flex box in the source design; without
-      // display:flex those properties are inert and the glyph sits top-left.
-      if (s?.items !== undefined || s?.justify !== undefined) node.style.display = 'flex';
-      applyBlockStyle(node, s, doc, ctx.onDiagnostic);
+      const node = textBox(document, style, ctx);
       node.textContent = resolveTags(String(block.text ?? ''), pkg, packages);
       makeClosable(node, ctx, block.action);
       return node;
@@ -1120,27 +1221,11 @@ function renderBlockIn(
       const node = div(document);
       const url = block.url || ctx.heroImageUrl;
       const s = style;
-      // The 160px/16px defaults suit a slot dropped into a flow column; a
-      // converted design sizes its own slot, and the defaults must not fight it.
-      const sized =
-        s !== undefined &&
-        (Boolean(s.inset) ||
-          s.height !== undefined ||
-          s.aspectRatio !== undefined ||
-          (s.top !== undefined && s.bottom !== undefined) ||
-          s.flex !== undefined);
       // A full-screen photo: the design's own art, and the first thing the
       // customer sees. It fills its stack parent on both axes and is fetched
       // and decoded eagerly, so nothing about it changes first paint.
       const fullScreen = s !== undefined && (Boolean(s.inset) || (s.top !== undefined && s.bottom !== undefined));
-      if (!sized) node.style.height = '160px';
-      if (s?.inset) {
-        node.style.width = '100%';
-        node.style.height = '100%';
-      }
-      node.style.borderRadius = block.shape === 'circle' ? '50%' : sized ? '0' : '16px';
-      node.style.overflow = 'hidden';
-      node.style.flexShrink = '0';
+      mediaFrame(node, s, block.shape === 'circle');
       applyBlockStyle(node, s, doc, ctx.onDiagnostic);
       if (url) {
         const img = document.createElement('img');
@@ -1358,6 +1443,66 @@ function renderBlockIn(
       return node;
     }
 
+    case 'timer': {
+      const deadline = timerDeadline(block, ctx.shownAt ?? Date.now());
+      const format = typeof block.format === 'string' ? block.format : '{hh}:{mm}:{ss}';
+      const expired = typeof block.expiredText === 'string' ? block.expiredText : undefined;
+      const remaining = () => Math.max(0, Math.floor((deadline - Date.now()) / 1000));
+      if (remaining() === 0 && expired === undefined) return null;
+      const node = textBox(document, style, ctx);
+      const draw = () => {
+        const r = remaining();
+        if (r > 0) node.textContent = formatCountdown(format, r);
+        else if (expired !== undefined) node.textContent = expired;
+        else node.style.display = 'none';
+        return r > 0;
+      };
+      if (draw()) whileShown(node, 1000, draw);
+      return node;
+    }
+
+    case 'video': {
+      const node = div(document);
+      mediaFrame(node, style, false);
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
+      const video = document.createElement('video');
+      video.muted = true;
+      for (const attr of ['muted', 'autoplay', 'loop', 'playsinline']) video.setAttribute(attr, '');
+      video.setAttribute('aria-hidden', 'true');
+      if (typeof block.poster === 'string') video.poster = block.poster;
+      if (typeof block.url === 'string') video.src = block.url;
+      video.style.cssText = 'width:100%;height:100%;display:block';
+      video.style.objectFit = block.fit ?? 'cover';
+      node.appendChild(video);
+      return node;
+    }
+
+    case 'toggle': {
+      const on = packages[block.onPackageIndex];
+      const off = packages[block.offPackageIndex];
+      if (!on || !off) return null;
+      const node = div(document, 'label');
+      node.style.display = 'flex';
+      node.style.alignItems = 'center';
+      node.style.gap = '12px';
+      node.style.cursor = 'pointer';
+      applyBlockStyle(node, style, doc, ctx.onDiagnostic);
+      const label = div(document, 'span');
+      label.style.flex = '1';
+      label.textContent = resolveTags(String(block.label ?? ''), pkg, packages);
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.setAttribute('role', 'switch');
+      input.className = SWITCH_CLASS;
+      input.style.setProperty('--rvx-accent', doc.accent);
+      input.checked = selectedPackageId(ctx) === on.packageId;
+      input.disabled = !ctx.onSelect;
+      input.addEventListener('change', () => ctx.onSelect?.((input.checked ? on : off).packageId));
+      node.addEventListener('click', (event) => event.stopPropagation());
+      node.append(label, input);
+      return node;
+    }
+
     case 'card':
       return renderCard(block, ctx, document, parent);
 
@@ -1374,7 +1519,7 @@ function containerBase(block: CardBlock, node: HTMLElement, style: BlockStyle | 
   // top/right offsets (a SAVE badge on a plan card) anchors to its own card
   // rather than the screen.
   node.style.position = 'relative';
-  if (layout === 'stack') return;
+  if (layout === 'stack' || layout === 'carousel') return;
   if (layout === 'grid') {
     node.style.display = 'grid';
     node.style.gridTemplateColumns = block.gridColumns ?? `repeat(${block.columns ?? 2}, minmax(0, 1fr))`;
@@ -1451,8 +1596,72 @@ function renderCard(
   applyBlockStyle(node, style, doc, ctx.onDiagnostic);
   const pinned = block.packageIndex !== undefined ? packages[block.packageIndex] : undefined;
   if (pinned) makeSelectable(node, ctx, pinned.packageId);
-  fill(node, scope);
+  if (layout === 'carousel') fillCarousel(node, block, ctx, document, scope, style);
+  else fill(node, scope);
   return node;
+}
+
+function fillCarousel(
+  node: HTMLElement,
+  block: CardBlock,
+  ctx: BlockRenderContext,
+  document: Document,
+  scope: BlockScope,
+  style: BlockStyle | undefined,
+): void {
+  const { doc } = ctx;
+  node.style.height = px(typeof style?.height === 'number' ? style.height : 220);
+  node.style.overflow = 'hidden';
+  const track = div(document);
+  track.className = CAROUSEL_CLASS;
+  track.style.cssText = 'display:flex;height:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory';
+  for (const child of Array.isArray(block.children) ? block.children : []) {
+    const rendered = renderBlock(child, ctx, document, scope);
+    if (!rendered) continue;
+    const page = div(document);
+    page.style.cssText =
+      'flex:0 0 100%;height:100%;position:relative;display:flex;flex-direction:column;scroll-snap-align:start';
+    rendered.style.flexGrow = '1';
+    page.appendChild(rendered);
+    track.appendChild(page);
+  }
+  node.appendChild(track);
+  const count = track.childNodes.length;
+  if (count < 2) return;
+
+  const dots = div(document);
+  dots.style.cssText =
+    'position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:6px;pointer-events:none';
+  const dotNodes: HTMLElement[] = [];
+  for (let i = 0; i < count; i++) {
+    const dot = div(document);
+    dot.style.cssText = 'width:6px;height:6px;border-radius:50%';
+    dots.appendChild(dot);
+    dotNodes.push(dot);
+  }
+  node.appendChild(dots);
+  const current = () => (track.clientWidth > 0 ? Math.round(track.scrollLeft / track.clientWidth) : 0);
+  const paint = (at: number) => {
+    dotNodes.forEach((dot, i) => {
+      dot.style.background = i === at ? doc.accent : withAlpha(doc.textColor, 0.3);
+    });
+  };
+  const saved = Math.min(ctx.carouselPages?.get(block.id) ?? 0, count - 1);
+  paint(saved);
+  if (saved > 0) document.defaultView?.requestAnimationFrame?.(() => (track.scrollLeft = saved * track.clientWidth));
+  track.addEventListener('scroll', () => {
+    const at = current();
+    ctx.carouselPages?.set(block.id, at);
+    paint(at);
+  });
+
+  const seconds = block.autoAdvance;
+  if (typeof seconds === 'number' && seconds > 0) {
+    whileShown(node, seconds * 1000, () => {
+      track.scrollTo({ left: ((current() + 1) % count) * track.clientWidth, behavior: 'smooth' });
+      return true;
+    });
+  }
 }
 
 function renderProducts(

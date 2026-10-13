@@ -67,3 +67,24 @@ describe('setLocale', () => {
     assert.notEqual(detectLocale(), 'fr-FR');
   });
 });
+
+describe('timer and toggle strings', () => {
+  test('format, expiredText and the toggle label localize; an absent expiredText stays absent', () => {
+    const doc = {
+      version: 1,
+      textColor: '#fff',
+      accent: '#000',
+      blocks: [
+        { id: 't', type: 'timer', duration: 60, format: 'Ends in {mm}:{ss}', expiredText: 'Expired' },
+        { id: 'u', type: 'timer', duration: 60 },
+        { id: 'g', type: 'toggle', label: 'Free trial', onPackageIndex: 0, offPackageIndex: 1 },
+      ],
+      locales: { es: { 't.format': 'Termina en {mm}:{ss}', 't.expiredText': 'Caducada', 'g.label': 'Prueba gratis' } },
+    };
+    const [timer, bare, toggle] = localizeBlockDoc(doc, 'es-MX').blocks;
+    assert.equal(timer.format, 'Termina en {mm}:{ss}');
+    assert.equal(timer.expiredText, 'Caducada');
+    assert.equal(bare.expiredText, undefined);
+    assert.equal(toggle.label, 'Prueba gratis');
+  });
+});

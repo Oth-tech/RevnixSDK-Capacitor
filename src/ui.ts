@@ -195,6 +195,8 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
   private content: HTMLDivElement | null = null;
   private internalSelected: string | undefined = undefined;
   private destroyed = false;
+  private readonly shownAt = Date.now();
+  private readonly carouselPages = new Map<string, number>();
 
   constructor(container: HTMLElement, options: RevnixPaywallOptions) {
     this.options = options;
@@ -389,6 +391,8 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           // live and does nothing.
           loading: o.loading,
           viewport: this.scroll,
+          shownAt: this.shownAt,
+          carouselPages: this.carouselPages,
           heroImageUrl: o.config.heroImageUrl,
           footer: { termsUrl: o.config.footer?.termsUrl, privacyUrl: o.config.footer?.privacyUrl },
           onRestore: o.onRestore ? () => this.restore() : undefined,
