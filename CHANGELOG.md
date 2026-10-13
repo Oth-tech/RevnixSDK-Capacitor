@@ -4,6 +4,7 @@
 
 ### Added
 
+- `advertisingId` configure option (Android): stores the Google Advertising ID on the customer as `gps_adid` after the install report, resent only when it changes and deleted after an opt-out. The app needs `com.google.android.gms:play-services-ads-identifier` and the `com.google.android.gms.permission.AD_ID` permission in the app; without them, or after an opt-out, nothing is stored.
 - Paywall blocks: `timer` (countdown to a date or from when the paywall opens), `video` (muted looping clip with a poster), `toggle` (free-trial switch that flips the selected package) and the card `carousel` layout (swipeable pages with dots and optional auto-advance).
 - `deviceIntegrity` configure option: attach Apple App Attest / Google Play Integrity evidence to install reports.
 

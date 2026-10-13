@@ -50,6 +50,10 @@ export interface ConfigureOptions {
    *  Play Integrity evidence to install reports; pairs with "Require device
    *  integrity" in the dashboard. Ignored on web. */
   deviceIntegrity?: boolean;
+  /** Android only. Default false. Store the Google Advertising ID on the
+   *  customer as `gps_adid` after the install report; the app needs
+   *  `play-services-ads-identifier` and the `AD_ID` permission. */
+  advertisingId?: boolean;
   /** iOS only (TP3). Hold the first `registerInstall` report up to this many
    *  milliseconds while the App Tracking Transparency prompt is unanswered,
    *  so the install goes out with the IDFA already stored. Unset = never

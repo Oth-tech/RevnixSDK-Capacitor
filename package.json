@@ -11,6 +11,7 @@
     "android/revnix-kotlin/revnix-core/src/main/",
     "android/revnix-kotlin/revnix-android/src/main/",
     "android/build.gradle",
+    "android/consumer-rules.pro",
     "dist/",
     "docs/",
     "ios/Sources",
