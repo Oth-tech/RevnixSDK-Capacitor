@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.6.0 (2026-10-12)
+
 ### Added
 
 - Paywall blocks: `timer` (countdown to a date or from when the paywall opens), `video` (muted looping clip with a poster), `toggle` (free-trial switch that flips the selected package) and the card `carousel` layout (swipeable pages with dots and optional auto-advance).
@@ -10,6 +12,8 @@
 ### Changed
 
 - Events are now batched and persisted, and placements resolve cache-first, via the 1.6.0 native SDKs.
+- Native SDKs: RevnixSDK-iOS d1979df → ef5d1a9, RevnixSDK-Android 0c952db → 1b6799a.
+- Web: react-native-revnix ^1.5.0 → ^1.6.0.
 
 ## 1.5.0 (2026-10-08)
 
