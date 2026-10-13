@@ -2,10 +2,17 @@
 
 ## Unreleased
 
+## 1.7.0 (2026-10-13)
+
 ### Added
 
 - Paywall blocks: `timer` (countdown to a date or from when the paywall opens), `video` (muted looping clip with a poster), `toggle` (free-trial switch that flips the selected package) and the card `carousel` layout (swipeable pages with dots and optional auto-advance).
 - `deviceIntegrity` configure option: attach Apple App Attest / Google Play Integrity evidence to install reports.
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS ef5d1a9 → d2bac3a, RevnixSDK-Android 1b6799a → 8077d6e.
+- Web: react-native-revnix ^1.6.0 → ^1.7.0.
 
 ## 1.6.0 (2026-10-12)
 
