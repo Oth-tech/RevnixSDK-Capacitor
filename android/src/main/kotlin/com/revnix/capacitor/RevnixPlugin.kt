@@ -25,6 +25,7 @@ import com.revnix.android.BillingException
 import com.revnix.android.PlayBillingConnector
 import com.revnix.android.PlayInstallReferrer
 import com.revnix.android.ProductNotFoundException
+import com.revnix.android.playIntegrity
 import com.revnix.android.ui.preload
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
@@ -75,6 +76,7 @@ class RevnixPlugin : Plugin() {
                 apiKey = apiKey,
                 baseUrl = baseUrl,
                 storage = AndroidStorage(context),
+                deviceIntegrity = if (call.getBoolean("deviceIntegrity") == true) playIntegrity(context) else null,
                 timeout = duration("timeoutMs", 10_000),
                 offlineMaxCacheAge = duration("offlineMaxCacheAgeMs", 14L * 24 * 3600 * 1000),
                 entitlementsTtl = duration("entitlementsTtlMs", 30_000),
