@@ -138,7 +138,8 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
             sessionTimeout: (call.getDouble("sessionTimeoutMs")
                 ?? revnixDefaultSessionTimeout * 1000) / 1000.0,
             skan: call.getBool("skan") ?? true,
-            attWaitTimeout: call.getDouble("attWaitTimeoutMs").map { $0 / 1000 }
+            attWaitTimeout: call.getDouble("attWaitTimeoutMs").map { $0 / 1000 },
+            deviceIntegrity: call.getBool("deviceIntegrity") ?? false
         )
         configOverride?(&config)
         let created = RevnixClient(config)

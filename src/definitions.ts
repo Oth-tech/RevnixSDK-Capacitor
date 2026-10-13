@@ -46,6 +46,10 @@ export interface ConfigureOptions {
   sessionTimeoutMs?: number;
   /** iOS only. Default true; set false to opt out of SKAdNetwork entirely. */
   skan?: boolean;
+  /** iOS and Android only. Default false. Attach Apple App Attest / Google
+   *  Play Integrity evidence to install reports; pairs with "Require device
+   *  integrity" in the dashboard. Ignored on web. */
+  deviceIntegrity?: boolean;
   /** iOS only (TP3). Hold the first `registerInstall` report up to this many
    *  milliseconds while the App Tracking Transparency prompt is unanswered,
    *  so the install goes out with the IDFA already stored. Unset = never
