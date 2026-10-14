@@ -197,6 +197,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
   private destroyed = false;
   private readonly shownAt = Date.now();
   private readonly carouselPages = new Map<string, number>();
+  private screen = 0;
 
   constructor(container: HTMLElement, options: RevnixPaywallOptions) {
     this.options = options;
@@ -268,6 +269,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
 
   update(options: Partial<RevnixPaywallOptions>): void {
     if (this.destroyed) return;
+    if (options.config && options.config !== this.options.config) this.screen = 0;
     this.options = { ...this.options, ...options };
     this.render();
   }
@@ -393,6 +395,12 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
           viewport: this.scroll,
           shownAt: this.shownAt,
           carouselPages: this.carouselPages,
+          screen: this.screen,
+          onScreen: (index) => {
+            this.screen = index;
+            this.scroll.scrollTop = 0;
+            this.render();
+          },
           heroImageUrl: o.config.heroImageUrl,
           footer: { termsUrl: o.config.footer?.termsUrl, privacyUrl: o.config.footer?.privacyUrl },
           onRestore: o.onRestore ? () => this.restore() : undefined,

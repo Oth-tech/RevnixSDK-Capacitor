@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Paywall onboarding screens: a block doc's `screens` render in order before the paywall, with `next` / `back` actions and progress dots, in one display.
+
 ## 1.7.0 (2026-10-13)
 
 ### Added

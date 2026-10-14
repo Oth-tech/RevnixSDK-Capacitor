@@ -173,6 +173,9 @@ export function localizeBlockDoc(
     ...doc,
     defaultLocale: chain[0],
     blocks: doc.blocks.map((b) => localizeBlock(b, lookup)),
+    ...(Array.isArray(doc.screens)
+      ? { screens: doc.screens.map((s) => (Array.isArray(s) ? s.map((b) => localizeBlock(b, lookup)) : s)) }
+      : {}),
   };
 }
 
