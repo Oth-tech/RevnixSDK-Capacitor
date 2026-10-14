@@ -2,9 +2,16 @@
 
 ## Unreleased
 
+## 1.8.0 (2026-10-14)
+
 ### Added
 
 - Paywall onboarding screens: a block doc's `screens` render in order before the paywall, with `next` / `back` actions and progress dots, in one display.
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS d2bac3a → 56a5ac8, RevnixSDK-Android 8077d6e → 8e29fcd.
+- Web: react-native-revnix ^1.7.0 → ^1.8.0.
 
 ## 1.7.0 (2026-10-13)
 

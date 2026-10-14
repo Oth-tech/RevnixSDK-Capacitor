@@ -1,6 +1,6 @@
 {
   "name": "revnix-capacitor",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Revnix SDK for Capacitor: in-app purchases through StoreKit 2 and Google Play Billing, entitlements, paywalls, A/B tests and attribution over the Revnix /v1 API.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -96,6 +96,6 @@
     }
   },
   "dependencies": {
-    "react-native-revnix": "^1.7.0"
+    "react-native-revnix": "^1.8.0"
   }
 }
