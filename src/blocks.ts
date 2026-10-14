@@ -100,8 +100,11 @@ export interface BlockStyle {
  *  A FIELD on the existing block types rather than a new block type, so an SDK
  *  older than this one drops it and still renders the element exactly as it
  *  does today — a design carrying a close chip degrades to inert rather than
- *  losing the chip, which is what a new block type would have cost. */
-export type BlockAction = 'close';
+ *  losing the chip, which is what a new block type would have cost.
+ *
+ *  `next` / `back` move between the doc's intro `screens` and only appear on
+ *  them; where one has nowhere to go the block is inert. */
+export type BlockAction = 'close' | 'next' | 'back';
 
 /** When a block is drawn, relative to the selected package (render contract
  *  v2, REV-262). `selected` draws it only inside a package card whose package
@@ -128,7 +131,7 @@ export interface BlockBase {
 export interface TextBlock extends BlockBase {
   type: 'text';
   text: string;
-  /** Tapping this block dismisses the paywall. See BlockAction. */
+  /** What tapping this block does. See BlockAction. */
   action?: BlockAction;
 }
 
@@ -138,7 +141,7 @@ export interface ImageBlock extends BlockBase {
   shape?: 'rect' | 'circle';
   fit?: 'cover' | 'contain';
   placeholder?: string;
-  /** Tapping this block dismisses the paywall. See BlockAction. */
+  /** What tapping this block does. See BlockAction. */
   action?: BlockAction;
 }
 
@@ -162,8 +165,9 @@ export interface ProductsBlock extends BlockBase {
 export interface ButtonBlock extends BlockBase {
   type: 'button';
   label: string;
-  /** `close` turns this button into a dismiss ("Not now") instead of the
-   *  purchase CTA, which is what a button means by default. */
+  /** `close` turns this button into a dismiss ("Not now"), and `next` /
+   *  `back` into screen navigation, instead of the purchase CTA, which is
+   *  what a button means by default. */
   action?: BlockAction;
 }
 
@@ -256,6 +260,10 @@ export interface PaywallBlockDoc {
   accentInk: string;
   fontFamily?: string;
   blocks: PaywallBlock[];
+  /** Onboarding screens shown in order before `blocks`, which stays the
+   *  purchase screen and is always the last one. Absent or empty = `blocks`
+   *  alone. They share the doc's palette, layout and `locales`. */
+  screens?: PaywallBlock[][];
   /** REV-271: the language the blocks' own copy is written in. Absent = "en".
    *  Never a key in a stored doc's `locales` — the tree IS that language's
    *  version. A localized copy names the language it was localized to. */
@@ -274,6 +282,8 @@ export const DESIGN_CANVAS = { width: 393, height: 852 };
  *  design never grows past ~1.22×; on a tablet or in landscape it is centred
  *  in the viewport and the screen background fills the space around it. */
 export const CANVAS_MAX_WIDTH = 480;
+
+const fitObservers = new WeakMap<HTMLElement, ResizeObserver>();
 
 /** How a canvas design maps onto one viewport, in CSS px. */
 export interface CanvasMetrics {
@@ -930,6 +940,12 @@ export interface BlockRenderContext {
   /** Each carousel's current page by block id, kept by the host so a
    *  re-render (a plan or toggle tap) does not send it back to page 1. */
   carouselPages?: Map<string, number>;
+  /** The screen on show: an index into `doc.screens`, where `screens.length`
+   *  is the paywall `blocks`. Kept by the host, like `carouselPages`. */
+  screen?: number;
+  /** Shows another screen. Omitted, a doc with `screens` opens straight on
+   *  the paywall, the way an SDK without screens renders it. */
+  onScreen?: (index: number) => void;
   /** Fills an image block that publishes no URL of its own. */
   heroImageUrl?: string;
   /** Paywall-level Terms/Privacy, used when a links block sets none. */
@@ -1082,21 +1098,37 @@ export function ensureBlockStyles(document: Document): void {
   (document.head ?? document.documentElement).appendChild(style);
 }
 
-/**
- * Makes an element the paywall's dismiss target when the design marks it as
- * one (REV-252). A block with no close action gets no listener at all, so it
- * never intercepts a tap meant for what sits behind it.
- */
-function makeClosable(node: HTMLElement, ctx: BlockRenderContext, action: BlockAction | undefined): void {
-  if (action !== 'close' || !ctx.onClose) return;
+function introScreens(doc: PaywallBlockDoc): PaywallBlock[][] {
+  return Array.isArray(doc.screens) ? doc.screens.filter((s) => Array.isArray(s) && s.length > 0) : [];
+}
+
+function screenIndex(ctx: BlockRenderContext): number {
+  const intro = introScreens(ctx.doc).length;
+  if (!ctx.onScreen) return intro;
+  return Math.min(Math.max(Math.trunc(ctx.screen ?? 0), 0), intro);
+}
+
+function actionHandler(ctx: BlockRenderContext, action: BlockAction | undefined): (() => void) | undefined {
+  if (action === 'close') return ctx.onClose;
+  const { onScreen } = ctx;
+  const at = screenIndex(ctx);
+  if (!onScreen || at >= introScreens(ctx.doc).length) return undefined;
+  if (action === 'next') return () => onScreen(at + 1);
+  if (action === 'back' && at > 0) return () => onScreen(at - 1);
+  return undefined;
+}
+
+function makeActionable(node: HTMLElement, ctx: BlockRenderContext, action: BlockAction | undefined): void {
+  const handler = actionHandler(ctx, action);
+  if (!handler) return;
   node.style.cursor = 'pointer';
   node.setAttribute('role', 'button');
-  node.setAttribute('aria-label', 'Close');
+  if (action === 'close') node.setAttribute('aria-label', 'Close');
   node.addEventListener('click', (event) => {
     // Consumes its own tap: a close chip pinned over a plan card would
     // otherwise also bubble into that card's selection handler.
     event.stopPropagation();
-    ctx.onClose?.();
+    handler();
   });
 }
 
@@ -1213,7 +1245,7 @@ function renderBlockIn(
     case 'text': {
       const node = textBox(document, style, ctx);
       node.textContent = resolveTags(String(block.text ?? ''), pkg, packages);
-      makeClosable(node, ctx, block.action);
+      makeActionable(node, ctx, block.action);
       return node;
     }
 
@@ -1252,7 +1284,7 @@ function renderBlockIn(
         slot.textContent = block.placeholder ?? 'image';
         node.appendChild(slot);
       }
-      makeClosable(node, ctx, block.action);
+      makeActionable(node, ctx, block.action);
       return node;
     }
 
@@ -1308,11 +1340,12 @@ function renderBlockIn(
       // and takes no accent fill: the CTA must stay the one accented thing on
       // the screen, or a "Not now" competes with "Subscribe" for the eye.
       const closes = block.action === 'close' && ctx.onClose !== undefined;
+      const navigates = block.action === 'next' || block.action === 'back';
       // A purchase in flight (render contract v2 §4): the button disables,
       // hides its label and spins in its place. It keeps its size and fill —
       // the spinner is centred over a hidden label, not swapped in for it —
       // so the screen does not reflow while the store answers.
-      const loading = !closes && ctx.loading === true;
+      const loading = !closes && !navigates && ctx.loading === true;
       node.style.background = closes ? 'transparent' : doc.accent;
       node.style.color = closes ? doc.textColor : doc.accentInk;
       node.style.borderRadius = '12px';
@@ -1351,8 +1384,8 @@ function renderBlockIn(
       } else {
         node.textContent = text;
       }
-      if (closes) {
-        makeClosable(node, ctx, block.action);
+      if (closes || navigates) {
+        makeActionable(node, ctx, block.action);
       } else if (ctx.onPurchase) {
         node.addEventListener('click', (event) => {
           // Consumes its own tap, the way RN's Pressable does. A CTA sitting
@@ -1629,23 +1662,10 @@ function fillCarousel(
   const count = track.childNodes.length;
   if (count < 2) return;
 
-  const dots = div(document);
-  dots.style.cssText =
-    'position:absolute;left:0;right:0;bottom:8px;display:flex;justify-content:center;gap:6px;pointer-events:none';
-  const dotNodes: HTMLElement[] = [];
-  for (let i = 0; i < count; i++) {
-    const dot = div(document);
-    dot.style.cssText = 'width:6px;height:6px;border-radius:50%';
-    dots.appendChild(dot);
-    dotNodes.push(dot);
-  }
+  const { row: dots, paint } = dotRow(document, doc, count);
+  dots.style.bottom = '8px';
   node.appendChild(dots);
   const current = () => (track.clientWidth > 0 ? Math.round(track.scrollLeft / track.clientWidth) : 0);
-  const paint = (at: number) => {
-    dotNodes.forEach((dot, i) => {
-      dot.style.background = i === at ? doc.accent : withAlpha(doc.textColor, 0.3);
-    });
-  };
   const saved = Math.min(ctx.carouselPages?.get(block.id) ?? 0, count - 1);
   paint(saved);
   if (saved > 0) document.defaultView?.requestAnimationFrame?.(() => (track.scrollLeft = saved * track.clientWidth));
@@ -1662,6 +1682,29 @@ function fillCarousel(
       return true;
     });
   }
+}
+
+function dotRow(
+  document: Document,
+  doc: PaywallBlockDoc,
+  count: number,
+): { row: HTMLElement; paint: (at: number) => void } {
+  const row = div(document);
+  row.style.cssText =
+    'position:absolute;left:0;right:0;display:flex;justify-content:center;gap:6px;pointer-events:none';
+  const dots: HTMLElement[] = [];
+  for (let i = 0; i < count; i++) {
+    const dot = div(document);
+    dot.style.cssText = 'width:6px;height:6px;border-radius:50%';
+    row.appendChild(dot);
+    dots.push(dot);
+  }
+  const paint = (at: number) => {
+    dots.forEach((dot, i) => {
+      dot.style.background = i === at ? doc.accent : withAlpha(doc.textColor, 0.3);
+    });
+  };
+  return { row, paint };
 }
 
 function renderProducts(
@@ -1820,8 +1863,11 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     for (const layer of art) screen.appendChild(layer);
   }
 
+  const screens = introScreens(doc);
+  const at = screenIndex(ctx);
+  const blocks = at < screens.length ? screens[at] : doc.blocks;
   const body = box(document);
-  for (const block of doc.blocks) {
+  for (const block of blocks) {
     const rendered = renderBlock(block, ctx, document);
     if (rendered) body.appendChild(rendered);
   }
@@ -1835,7 +1881,13 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
   // Appended to the SCREEN rather than the body so it sits outside the canvas
   // scale transform, keeping its tap size and its distance from the screen
   // edge whatever the device width does to the design.
-  const closeChip = fallbackClose(ctx, document);
+  const closeChip = fallbackClose(ctx, document, blocks);
+  const progress = at < screens.length ? dotRow(document, doc, screens.length + 1) : undefined;
+  if (progress) {
+    progress.paint(at);
+    progress.row.style.zIndex = '50';
+    progress.row.style.top = '20px';
+  }
 
   if (doc.layout === 'canvas') {
     // Laid out at 1× and scaled, so absolute placement inside `stack`
@@ -1876,12 +1928,18 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
       }
     };
     if (closeChip) screen.appendChild(closeChip);
+    if (progress) screen.appendChild(progress.row);
     fit();
     // The container is often laid out after this returns (a freshly appended
     // overlay measures 0), so re-fit when it gets a size. ResizeObserver is
     // absent in older WebViews — the initial fit still applies there.
     const RO = (document.defaultView as unknown as { ResizeObserver?: typeof ResizeObserver })?.ResizeObserver;
-    if (typeof RO === 'function') new RO(fit).observe(measured);
+    if (typeof RO === 'function') {
+      fitObservers.get(measured)?.disconnect();
+      const observer = new RO(fit);
+      fitObservers.set(measured, observer);
+      observer.observe(measured);
+    }
     return screen;
   }
 
@@ -1898,6 +1956,11 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
     screen.style.position = 'relative';
     screen.appendChild(closeChip);
   }
+  if (progress) {
+    progress.row.style.top = 'calc(20px + env(safe-area-inset-top))';
+    screen.style.position = 'relative';
+    screen.appendChild(progress.row);
+  }
   return screen;
 }
 
@@ -1908,9 +1971,9 @@ export function renderBlockDoc(ctx: BlockRenderContext, document: Document): HTM
  * the screen's own ink rather than a fixed white, so it stays legible on a
  * light design as well as a dark one.
  */
-function fallbackClose(ctx: BlockRenderContext, document: Document): HTMLElement | null {
+function fallbackClose(ctx: BlockRenderContext, document: Document, blocks: PaywallBlock[]): HTMLElement | null {
   const { onClose, doc } = ctx;
-  if (!onClose || hasCloseAction(doc.blocks)) return null;
+  if (!onClose || hasCloseAction(blocks)) return null;
   const node = div(document, 'button');
   (node as HTMLButtonElement).type = 'button';
   node.setAttribute('aria-label', 'Close');
