@@ -50,6 +50,12 @@ export interface ConfigureOptions {
    *  Play Integrity evidence to install reports; pairs with "Require device
    *  integrity" in the dashboard. Ignored on web. */
   deviceIntegrity?: boolean;
+  /** Android only. Default false. Collect the Google Advertising ID; the app
+   *  must add play-services-ads-identifier and the AD_ID permission.
+   *  When limit-ad-tracking is on no id is sent and a previously sent id is
+   *  cleared. If play-services-ads-identifier is missing no id is collected
+   *  and the 'diagnostic' listener reports it. Ignored on iOS and web. */
+  collectAdvertisingId?: boolean;
   /** iOS only (TP3). Hold the first `registerInstall` report up to this many
    *  milliseconds while the App Tracking Transparency prompt is unanswered,
    *  so the install goes out with the IDFA already stored. Unset = never

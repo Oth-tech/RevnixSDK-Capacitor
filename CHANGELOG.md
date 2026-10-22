@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `collectAdvertisingId` option on `configure` (default false, Android only): reports the Google Advertising ID as `gps_adid`. Needs `com.google.android.gms:play-services-ads-identifier` and the `AD_ID` permission in the app. With limit ad tracking on, no id is sent and a previously sent id is cleared; without the dependency no id is sent and the `diagnostic` listener (`addListener('diagnostic', …)`) reports it.
+
 ## 1.8.1 (2026-10-17)
 
 ### Changed
