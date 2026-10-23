@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.10.0 (2026-10-23)
+
 ### Added
 
 - `Revnix.identify({ userId })` returns `{ customerId }`: adopts the given customer id on the device with no network call, using the native 1.9.0 `identify`. Native only; on web it throws "Revnix.identify() is mobile only…". Trims the id; an empty id or one over 200 characters is ignored and the current id is returned. Your backend must still call `POST /v1/identify` with a secret key to merge the anonymous history.
@@ -9,6 +11,7 @@
 ### Changed
 
 - The offline entitlement cache is not signed yet: the bundled native SDKs (1.9.0) do not verify the server's new entitlement signature. Verification arrives when the plugin next bumps its native iOS and Android SDKs.
+- Native SDKs: RevnixSDK-iOS 46e92d7 → 3acce2c, RevnixSDK-Android 26255ae → 986f79d.
 
 ## 1.9.0 (2026-10-23)
 
