@@ -95,6 +95,10 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
     return { customerId: await this.require().logout() };
   }
 
+  async identify(): Promise<{ customerId: string }> {
+    throw new Error('Revnix.identify() is mobile only: on web, merge from your server with POST /v1/identify');
+  }
+
   async getEntitlements(): Promise<CustomerEntitlements> {
     return (await this.require().getEntitlements()) as CustomerEntitlements;
   }

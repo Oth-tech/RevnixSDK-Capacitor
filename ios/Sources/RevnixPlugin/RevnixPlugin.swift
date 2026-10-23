@@ -23,6 +23,7 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "configure", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getCustomerId", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "logout", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "identify", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getEntitlements", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getCachedEntitlements", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "isEntitled", returnType: CAPPluginReturnPromise),
@@ -202,6 +203,15 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func logout(_ call: CAPPluginCall) {
         guard let client = requireClient(call) else { return }
         Task { call.resolve(["customerId": await client.logout()]) }
+    }
+
+    @objc func identify(_ call: CAPPluginCall) {
+        guard let client = requireClient(call) else { return }
+        guard let userId = call.getString("userId") else {
+            call.reject("userId is required", "invalid")
+            return
+        }
+        Task { call.resolve(["customerId": await client.identify(userId)]) }
     }
 
     // MARK: - Entitlements

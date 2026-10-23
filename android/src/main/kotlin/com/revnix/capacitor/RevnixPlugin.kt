@@ -194,6 +194,17 @@ class RevnixPlugin : Plugin() {
         call.resolve(JSObject().put("customerId", active.logout()))
     }
 
+    @PluginMethod
+    fun identify(call: PluginCall) {
+        val active = requireClient(call) ?: return
+        val userId = call.getString("userId")
+        if (userId == null) {
+            call.reject("userId is required", "invalid")
+            return
+        }
+        call.resolve(JSObject().put("customerId", active.identify(userId)))
+    }
+
     // MARK: - Entitlements
 
     @PluginMethod
