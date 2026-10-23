@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 1.9.0 (2026-10-23)
+
 ### Added
 
 - `collectAdvertisingId` option on `configure` (default false, Android only): reports the Google Advertising ID as `gps_adid`. Needs `com.google.android.gms:play-services-ads-identifier` and the `AD_ID` permission in the app. With limit ad tracking on, no id is sent and a previously sent id is cleared; without the dependency no id is sent and the `diagnostic` listener (`addListener('diagnostic', …)`) reports it.
@@ -9,6 +11,7 @@
 ### Changed
 
 - Web: react-native-revnix ^1.8.0 → ^1.9.0. `handleDeepLink` now reports only scheme, host, path and known attribution query params; other query params, the fragment and credentials are dropped before upload.
+- Native SDKs: RevnixSDK-iOS 4e83602 → 46e92d7, RevnixSDK-Android 8e29fcd → 26255ae.
 
 ## 1.8.1 (2026-10-17)
 
