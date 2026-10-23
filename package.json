@@ -96,6 +96,6 @@
     }
   },
   "dependencies": {
-    "react-native-revnix": "^1.8.0"
+    "react-native-revnix": "^1.9.0"
   }
 }
