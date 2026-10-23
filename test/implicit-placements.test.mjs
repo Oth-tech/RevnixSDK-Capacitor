@@ -134,12 +134,12 @@ describe('REV-272 implicit placements (Capacitor web)', () => {
       implicitPlacements: true,
     });
     await settle();
-    await web.handleDeepLink({ url: 'https://example.com/promo?ref=ad' });
+    await web.handleDeepLink({ url: 'https://example.com/promo?utm_source=ad&token=x' });
     await settle();
 
     const trigger = triggers(calls).at(-1);
     assert.equal(trigger.body.placement, 'deeplink_open');
-    assert.equal(trigger.body.url, 'https://example.com/promo?ref=ad');
+    assert.equal(trigger.body.url, 'https://example.com/promo?utm_source=ad');
   });
 
   test('the wire keys are the ones the server accepts', async () => {
