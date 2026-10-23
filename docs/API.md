@@ -3,6 +3,7 @@
 * [`configure(...)`](#configure)
 * [`getCustomerId()`](#getcustomerid)
 * [`logout()`](#logout)
+* [`identify(...)`](#identify)
 * [`getEntitlements()`](#getentitlements)
 * [`getCachedEntitlements()`](#getcachedentitlements)
 * [`isEntitled(...)`](#isentitled)
@@ -89,6 +90,24 @@ logout() => Promise<{ customerId: string; }>
 
 Mint a fresh anonymous identity. Call at sign-out, or the next user
 inherits the previous one's cached entitlements.
+
+**Returns:** <code>Promise&lt;{ customerId: string; }&gt;</code>
+
+--------------------
+
+
+### identify(...)
+
+```typescript
+identify(options: { userId: string; }) => Promise<{ customerId: string; }>
+```
+
+Adopt `userId` as this device's customer id locally (no network call).
+Empty or over 200 characters is ignored. Native only.
+
+| Param         | Type                             |
+| ------------- | -------------------------------- |
+| **`options`** | <code>{ userId: string; }</code> |
 
 **Returns:** <code>Promise&lt;{ customerId: string; }&gt;</code>
 
@@ -738,7 +757,7 @@ removeAllListeners() => Promise<void>
 
 | Prop                       | Type                                                | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | -------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **`apiKey`**               | <code>string</code>                                 | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary; identify/alias are server-proxied by design and not part of this plugin.                                                                                                                                                                                                                                                                      |
+| **`apiKey`**               | <code>string</code>                                 | Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app + environment server-side. Secret keys must never ship in a binary, so merging history is server-side (`POST /v1/identify` with a secret key); `identify()` only adopts the id on this device. alias stays server-only.                                                                                                                                                                                           |
 | **`baseUrl`**              | <code>string</code>                                 | e.g. `https://your-deployment.convex.site`                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **`timeoutMs`**            | <code>number</code>                                 | Per-request timeout in ms. Default 10 000.                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | **`entitlementsTtlMs`**    | <code>number</code>                                 | Soft TTL on entitlement reads in ms. Default 30 000; 0 = always fetch.                                                                                                                                                                                                                                                                                                                                                                                                                   |

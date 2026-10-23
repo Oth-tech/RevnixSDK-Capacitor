@@ -6,8 +6,9 @@ export type RevnixStoreKind = 'apple' | 'google';
 export interface ConfigureOptions {
   /**
    * Publishable key (`rvx_pk_live_…` / `rvx_pk_test_…`). The key fixes app +
-   * environment server-side. Secret keys must never ship in a binary;
-   * identify/alias are server-proxied by design and not part of this plugin.
+   * environment server-side. Secret keys must never ship in a binary, so
+   * merging history is server-side (`POST /v1/identify` with a secret key);
+   * `identify()` only adopts the id on this device. alias stays server-only.
    */
   apiKey: string;
   /** e.g. `https://your-deployment.convex.site` */
@@ -379,6 +380,10 @@ export interface RevnixPlugin {
   /** Mint a fresh anonymous identity. Call at sign-out, or the next user
    *  inherits the previous one's cached entitlements. */
   logout(): Promise<{ customerId: string }>;
+
+  /** Adopt `userId` as this device's customer id locally (no network call).
+   *  Empty or over 200 characters is ignored. Native only. */
+  identify(options: { userId: string }): Promise<{ customerId: string }>;
 
   /** Network-first entitlement read. Transient failures serve the cache
    *  flagged `stale`; deliberate rejections (401/403/404/409) reject. */
