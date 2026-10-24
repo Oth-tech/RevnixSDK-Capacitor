@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.10.1 (2026-10-24)
+
+### Changed
+
+- Native SDKs: RevnixSDK-iOS 3acce2c → 2c65edf, RevnixSDK-Android 986f79d → f1b54dd.
+
 ## 1.10.0 (2026-10-23)
 
 ### Added
