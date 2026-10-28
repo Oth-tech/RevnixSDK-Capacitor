@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- `logPaywallShown({ productsShown })` and `renderRevnixPaywall` report the products on screen (`productId`, `priceLabel`, `amountMinor`, `currency`) with the paywall display. Omitted when empty. The native glue needs the iOS and Android SDK bumps that add the field.
+
 ## 1.10.1 (2026-10-24)
 
 ### Changed

@@ -11,7 +11,7 @@
 // 'revnix-capacitor'`. The host container must have a height (a full-screen
 // overlay is the usual shape); the paywall fills it and scrolls internally.
 
-import type { PaywallConfig, RevnixPaywallEvent } from './definitions';
+import type { PaywallConfig, RevnixPaywallEvent, RevnixPaywallProductShown } from './definitions';
 import { asBlockDoc, renderBlockDoc } from './blocks';
 import type { PaywallBlockDoc } from './blocks';
 import { detectLocale, localizeBlockDoc } from './locale';
@@ -36,6 +36,12 @@ export interface RevnixPaywallPackage {
    *  rest of the ledger does. Optional: without it the interaction is still
    *  reported, just with no plan attached. */
   productId?: string;
+}
+
+function visiblePackages(config: PaywallConfig, packages: RevnixPaywallPackage[]): RevnixPaywallPackage[] {
+  return config.template === 'minimal' && config.highlightPackageId
+    ? packages.filter((p) => p.packageId === config.highlightPackageId)
+    : packages;
 }
 
 /** Colors the paywall renders with. Defaults mirror the dashboard preview
@@ -136,6 +142,7 @@ export interface RevnixPaywallOptions {
     logPaywallShown: (options?: {
       placementKey?: string;
       paywallId?: string;
+      productsShown?: RevnixPaywallProductShown[];
     }) => void | Promise<void | { viewId?: string }>;
     /** Older clients predate close reporting; the paywall still closes. */
     logPaywallClosed?: (options: {
@@ -216,7 +223,25 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
     // fire-and-forget beacon — a failed delivery never breaks the paywall.
     const { client, placementKey, paywallId, disableViewTracking } = options;
     if (client && !disableViewTracking && placementKey !== PREVIEW_PLACEMENT_KEY) {
-      this.viewReport = Promise.resolve(client.logPaywallShown({ placementKey, paywallId }))
+      const productsShown = visiblePackages(options.config, options.packages).flatMap((p) =>
+        p.productId
+          ? [
+              {
+                productId: p.productId,
+                ...(p.priceLabel !== undefined ? { priceLabel: p.priceLabel } : {}),
+                ...(p.amountMinor !== undefined ? { amountMinor: p.amountMinor } : {}),
+                ...(p.currency !== undefined ? { currency: p.currency } : {}),
+              },
+            ]
+          : [],
+      );
+      this.viewReport = Promise.resolve(
+        client.logPaywallShown({
+          placementKey,
+          paywallId,
+          ...(productsShown.length ? { productsShown } : {}),
+        }),
+      )
         .then((result) => {
           // A client that predates REV-252 resolves with void; the close then
           // still fires the host callback, it just cannot be paired with this
@@ -537,10 +562,7 @@ class RevnixPaywallRenderer implements RevnixPaywallHandle {
 
     // Same template semantics as the dashboard preview: "minimal" shows only
     // the highlighted package; feature bullets render on the feature layouts.
-    const shown =
-      layout === 'minimal' && config.highlightPackageId
-        ? packages.filter((p) => p.packageId === config.highlightPackageId)
-        : packages;
+    const shown = visiblePackages(config, packages);
 
     const fallbackSelected: string | undefined =
       shown.find((p) => p.packageId === config.highlightPackageId)?.packageId ?? shown[0]?.packageId;

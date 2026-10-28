@@ -10,6 +10,7 @@ import type {
   RegisterPurchaseInput,
   RegisterPurchaseResult,
   RevnixAttribution,
+  RevnixPaywallProductShown,
   RevnixPaywallEvent,
   RevnixPlugin,
 } from './definitions';
@@ -202,6 +203,7 @@ export class RevnixWeb extends WebPlugin implements RevnixPlugin {
   async logPaywallShown(options?: {
     placementKey?: string;
     paywallId?: string;
+    productsShown?: RevnixPaywallProductShown[];
   }): Promise<{ viewId?: string }> {
     return { viewId: this.require().logPaywallShown(options) };
   }

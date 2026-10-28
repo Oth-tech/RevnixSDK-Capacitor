@@ -441,12 +441,26 @@ class RevnixPlugin : Plugin() {
         val active = requireClient(call) ?: return
         val placementKey = call.getString("placementKey")
         val paywallId = call.getString("paywallId")
+        val productsShown = call.getArray("productsShown")?.let { arr ->
+            (0 until arr.length()).mapNotNull { i ->
+                val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                val productId = o.optString("productId").takeIf { it.isNotEmpty() }
+                    ?: return@mapNotNull null
+                com.revnix.PaywallProductShown(
+                    productId = productId,
+                    priceLabel = if (o.has("priceLabel")) o.optString("priceLabel") else null,
+                    amountMinor = if (o.has("amountMinor")) o.optLong("amountMinor") else null,
+                    currency = if (o.has("currency")) o.optString("currency") else null,
+                )
+            }
+        }
         scope.launch {
             // REV-252: resolves with the view id so the JS side can pair this
             // display's close with it. An older JS caller ignores the field.
             val viewId = active.logPaywallDisplay(
                 placementKey = placementKey,
                 paywallId = paywallId,
+                productsShown = productsShown,
             )
             call.resolve(JSObject().put("viewId", viewId))
         }
