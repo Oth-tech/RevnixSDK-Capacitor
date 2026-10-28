@@ -361,6 +361,14 @@ export type RevnixPaywallEvent =
   | 'restore'
   | 'error';
 
+/** One product visible on a displayed paywall. */
+export interface RevnixPaywallProductShown {
+  productId: string;
+  priceLabel?: string;
+  amountMinor?: number;
+  currency?: string;
+}
+
 export interface RevnixPlugin {
   /** Configure once at startup. Native platforms drain the purchase retry
    *  queue and report the install as launch chores (both idempotent), and
@@ -462,6 +470,9 @@ export interface RevnixPlugin {
   logPaywallShown(options?: {
     placementKey?: string;
     paywallId?: string;
+    /** The products on screen. Omitted when empty; capped at 20 entries and
+     *  64-character labels by the SDKs. */
+    productsShown?: RevnixPaywallProductShown[];
   }): Promise<{ viewId?: string }>;
 
   /** Fire-and-forget paywall dismissal (REV-252) — the other half of a

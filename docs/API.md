@@ -323,7 +323,7 @@ the app's Info.plist, or Apple never delivers the postback.
 ### logPaywallShown(...)
 
 ```typescript
-logPaywallShown(options?: { placementKey?: string | undefined; paywallId?: string | undefined; } | undefined) => Promise<{ viewId?: string; }>
+logPaywallShown(options?: { placementKey?: string | undefined; paywallId?: string | undefined; productsShown?: RevnixPaywallProductShown[] | undefined; } | undefined) => Promise<{ viewId?: string; }>
 ```
 
 Fire-and-forget paywall impression. Call when the paywall becomes
@@ -335,9 +335,9 @@ when the customer dismisses THIS display: the two events sharing one view
 id is what lets the ledger pair a close with the display it ended.
 `renderRevnixPaywall` does all of this for you.
 
-| Param         | Type                                                        |
-| ------------- | ----------------------------------------------------------- |
-| **`options`** | <code>{ placementKey?: string; paywallId?: string; }</code> |
+| Param         | Type                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------- |
+| **`options`** | <code>{ placementKey?: string; paywallId?: string; productsShown?: RevnixPaywallProductShown[]; }</code> |
 
 **Returns:** <code>Promise&lt;{ viewId?: string; }&gt;</code>
 
@@ -976,6 +976,18 @@ something the app needs to branch on.
 | --------------- | ------------------- |
 | **`key`**       | <code>string</code> |
 | **`variantId`** | <code>string</code> |
+
+
+#### RevnixPaywallProductShown
+
+One product visible on a displayed paywall.
+
+| Prop              | Type                |
+| ----------------- | ------------------- |
+| **`productId`**   | <code>string</code> |
+| **`priceLabel`**  | <code>string</code> |
+| **`amountMinor`** | <code>number</code> |
+| **`currency`**    | <code>string</code> |
 
 
 #### LastDeepLink

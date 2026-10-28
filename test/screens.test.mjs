@@ -147,6 +147,34 @@ describe('renderRevnixPaywall with screens', () => {
     assert.deepEqual(shown, [1]);
     assert.deepEqual(closed, [1]);
   });
+
+  test('reports the products drawn with their localized prices', () => {
+    const calls = [];
+    const client = { logPaywallShown: async (o) => (calls.push(o), { viewId: 'v1' }) };
+    renderRevnixPaywall(document.createElement('div'), {
+      config: { blocks: DOC },
+      packages: [
+        { packageId: 'm', title: 'Monthly', priceLabel: '$9.99', amountMinor: 999, currency: 'USD', productId: 'pro.monthly' },
+        { packageId: 'a', title: 'Annual', priceLabel: '$59.99', productId: 'pro.annual' },
+        { packageId: 'x', title: 'No id', priceLabel: '$1' },
+      ],
+      onPurchase: () => {},
+      placementKey: 'onboarding',
+      client,
+    });
+    assert.deepEqual(calls[0].productsShown, [
+      { productId: 'pro.monthly', priceLabel: '$9.99', amountMinor: 999, currency: 'USD' },
+      { productId: 'pro.annual', priceLabel: '$59.99' },
+    ]);
+    renderRevnixPaywall(document.createElement('div'), {
+      config: { blocks: DOC },
+      packages: [{ packageId: 'x', title: 'No id', priceLabel: '$1' }],
+      onPurchase: () => {},
+      placementKey: 'onboarding',
+      client,
+    });
+    assert.deepEqual(Object.keys(calls[1]), ['placementKey', 'paywallId']);
+  });
 });
 
 describe('canvas ResizeObserver', () => {

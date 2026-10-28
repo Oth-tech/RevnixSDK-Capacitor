@@ -437,11 +437,22 @@ public class RevnixPlugin: CAPPlugin, CAPBridgedPlugin {
         guard let client = requireClient(call) else { return }
         let placementKey = call.getString("placementKey")
         let paywallId = call.getString("paywallId")
+        let productsShown = (call.getArray("productsShown") as? [[String: Any]])?.compactMap {
+            entry -> RevnixPaywallProductShown? in
+            guard let productId = entry["productId"] as? String, !productId.isEmpty else { return nil }
+            return RevnixPaywallProductShown(
+                productId: productId,
+                priceLabel: entry["priceLabel"] as? String,
+                amountMinor: (entry["amountMinor"] as? NSNumber)?.intValue,
+                currency: entry["currency"] as? String)
+        }
         Task {
             // REV-252: resolves with the view id so the JS side can pair this
             // display's close with it. An older JS caller ignores the field.
             let viewId = await client.logPaywallDisplay(
-                placementKey: placementKey, paywallId: paywallId)
+                placementKey: placementKey, paywallId: paywallId, decisionId: nil,
+                priceShown: nil, screenIndex: nil, blockId: nil, durationMs: nil,
+                productsShown: productsShown)
             call.resolve(viewId.map { ["viewId": $0] } ?? [:])
         }
     }
